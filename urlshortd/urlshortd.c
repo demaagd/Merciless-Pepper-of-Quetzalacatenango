@@ -248,32 +248,39 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			LOG_DEBUG(vlevel, "Looks like a new insert request: %s\n",request_info->query_string);
 
 			mg_md5(hash, (char*)(request_info->query_string)+2, NULL);
-			db_insert(&dbh, hash, (char*)(request_info->query_string)+2, (int)(now.tv_sec));
+			if(db_insert(&dbh, hash, (char*)(request_info->query_string)+2, (int)(now.tv_sec))) {
+				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Unable to insert, maybe a duplicate?");
+				mg_printf(conn,
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: text/html\r\n"
+									"Content-Length: %d\r\n"        
+									"\r\n"
+									"%s",
+									(int)strlen(errresp), errresp);
+				free(errresp);
+			} else {
+				resplen=48+strlen(mg_get_header(conn, "Host"));
+				respurl=calloc(resplen, sizeof(char));
+				snprintf(respurl,resplen,"http://%s/%s",mg_get_header(conn, "Host"), hash);
 
-			// XXX Error on failures
-			// XXX respond with URL as a 301
+				requrl=calloc(strlen((char*)request_info->query_string)*2,sizeof(char));
+				url_decode((char*)(request_info->query_string)+2, strlen((char*)(request_info->query_string)+2), requrl, strlen((char*)(request_info->query_string))*2, 1);
+				tu=strreplace(tmpldata[TMPL_NEW],"ULINK",requrl);
+				tr=strreplace(tu, "RLINK", respurl);
 
-			resplen=48+strlen(mg_get_header(conn, "Host"));
-			respurl=calloc(resplen, sizeof(char));
-			snprintf(respurl,resplen,"http://%s/%s",mg_get_header(conn, "Host"), hash);
+				mg_printf(conn,
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: text/html\r\n"
+									"Content-Length: %d\r\n"        
+									"\r\n"
+									"%s\r\n",
+									(int)strlen(tr), tr);
 
-			requrl=calloc(strlen((char*)request_info->query_string)*2,sizeof(char));
-			url_decode((char*)(request_info->query_string)+2, strlen((char*)(request_info->query_string)+2), requrl, strlen((char*)(request_info->query_string))*2, 1);
-			tu=strreplace(tmpldata[TMPL_NEW],"ULINK",requrl);
-			tr=strreplace(tu, "RLINK", respurl);
-
-			mg_printf(conn,
-								"HTTP/1.1 200 OK\r\n"
-								"Content-Type: text/html\r\n"
-								"Content-Length: %d\r\n"        
-								"\r\n"
-								"%s\r\n",
-								(int)strlen(tr), tr);
-
-			free(tr);
-			free(tu);
-			free(requrl);
-			free(respurl);
+				free(tr);
+				free(tu);
+				free(requrl);
+				free(respurl);
+			}
 			free(hash);
 		} else if (ishash(req+1)) { // redirect
 			char *uri=NULL, *uridec;
