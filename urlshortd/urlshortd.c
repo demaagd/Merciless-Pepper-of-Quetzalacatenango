@@ -62,7 +62,16 @@ void usage(char *err, int ec) {
 	if(err!=NULL) {
 		fprintf(stderr,"Error: %s\n\n",err);
 	}
-	fprintf(stderr,"There should be some usage info here...\n");
+	fprintf(stderr,"Usage:\n"
+					" -d database definition -- Specifies database connection to use, module:/path/to/file\n"
+					" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"
+					" -n N                   -- Number of HTTP serving threads (default: 10)\n"
+					" -a /path/to/accessfile -- Access log file, must be writable (if it exists) or in a writable dir (if it does not exist, it will be created)\n"
+					" -t /path/to/templates  -- Template directory\n"
+					" -v                     -- Increases verbose level, can be specified multiple times\n"
+					" -h                     -- This help listing\n"
+);
+
 	exit(ec);
 }
 
@@ -211,21 +220,21 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			// XXX how to get more status 
 			char *status=strreplace(tmpldata[TMPL_STATUS],"STATUS","OK");
 			mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/plain\r\n"
-              "Content-Length: %d\r\n"        
-              "\r\n"
-              "%s",
-              (int)strlen(status), status);
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/plain\r\n"
+								"Content-Length: %d\r\n"        
+								"\r\n"
+								"%s",
+								(int)strlen(status), status);
 			free(status);
 		} else if(strncmp(req, "/\0", 2) == 0) { // home page
 			mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/HTML\r\n"
-              "Content-Length: %d\r\n"        
-              "\r\n"
-              "%s",
-              (int)strlen(tmpldata[TMPL_INDEX]), tmpldata[TMPL_INDEX]);
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/HTML\r\n"
+								"Content-Length: %d\r\n"        
+								"\r\n"
+								"%s",
+								(int)strlen(tmpldata[TMPL_INDEX]), tmpldata[TMPL_INDEX]);
 		} else if(strncmp(req, "/list\0", 6) == 0) { // list 
 			// XXX fill in list page
 		} else if(strncmp(req, "/n/\0", 4) == 0 && ((char*)(request_info->query_string))[0]=='u' && ((char*)(request_info->query_string))[1]=='=') { // new redirect
@@ -254,12 +263,12 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			tr=strreplace(tu, "RLINK", respurl);
 
 			mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/html\r\n"
-              "Content-Length: %d\r\n"        
-              "\r\n"
-              "%s\r\n",
-              (int)strlen(tr), tr);
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/html\r\n"
+								"Content-Length: %d\r\n"        
+								"\r\n"
+								"%s\r\n",
+								(int)strlen(tr), tr);
 
 			free(tr);
 			free(tu);
@@ -278,35 +287,35 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 				url_decode(uri, strlen(uri), uridec, strlen((char*)uri)*2, 1);
 		
 				mg_printf(conn,
-  	           "HTTP/1.1 301 Moved Permanently\r\n"
-    	         "Content-Type: text/plain\r\n"
-      	       "Content-Length: %d\r\n"
-							 "Location: %s\r\n"
-          	   "\r\n"
-            	 "Redirect to: %s\r\n",
-								(int)strlen((char*)uridec)+15, (char*)uridec, (char*)uridec);
+									"HTTP/1.1 301 Moved Permanently\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: %d\r\n"
+									"Location: %s\r\n"
+									"\r\n"
+									"Redirect to: %s\r\n",
+									(int)strlen((char*)uridec)+15, (char*)uridec, (char*)uridec);
 				free(uridec);
 				free(uri);
 			} else {
 				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Don't think that is a valid redirect");
 				mg_printf(conn,
- 	             "HTTP/1.1 200 OK\r\n"
- 	             "Content-Type: text/html\r\n"
- 	             "Content-Length: %d\r\n"        
- 	             "\r\n"
- 	             "%s",
- 	             (int)strlen(errresp), errresp);
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: text/html\r\n"
+									"Content-Length: %d\r\n"        
+									"\r\n"
+									"%s",
+									(int)strlen(errresp), errresp);
 				free(errresp);
 			}
 		} else { // other
 			char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Not sure what you meant by that...");
 			mg_printf(conn,
-              "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/html\r\n"
-              "Content-Length: %d\r\n"        
-              "\r\n"
-              "%s",
-              (int)strlen(errresp), errresp);
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/html\r\n"
+								"Content-Length: %d\r\n"        
+								"\r\n"
+								"%s",
+								(int)strlen(errresp), errresp);
 			free(errresp);
 		}
 		free(req);
@@ -325,7 +334,7 @@ int main(int argc, char **argv) {
 	void *dlh;
 
 	char *dle;
-	char *dbfile=NULL;
+	char *dbs=NULL;
 	char *lpstr=NULL;
 	char *ntstr=NULL;
 	char *alfile=NULL;
@@ -340,40 +349,40 @@ int main(int argc, char **argv) {
 	// command line parsing
 	while ((goopt=getopt (argc, argv, "d:p:n:a:t:vh")) != -1) {
 		switch (goopt) {
-			case 'd': // database 
-				dbfile=calloc(strlen((char*)optarg)+1,sizeof(char));
-				strncpy(dbfile,(char*)optarg,strlen((char*)optarg));
-				break;
-			case 't':
-				tdir=calloc(strlen((char*)optarg)+1,sizeof(char));
-				strncpy(tdir,(char*)optarg,strlen((char*)optarg));
-				break;
-			case 'a':
-				alfile=calloc(strlen((char*)optarg)+1,sizeof(char));
-				strncpy(alfile,(char*)optarg,strlen((char*)optarg));
-				break;
-			case 'p': // port
-				listenport=atoi(optarg);
-				break;
-			case 'n': // number of threads
-				numthreads=atoi(optarg);
-				break;
-			case 'v': // verbose
-				vlevel++;
-				break;
-			case 'h': // help
-				usage(NULL,EXIT_SUCCESS);
-				break;
-			default: // fallthrough
-				usage(NULL,EXIT_FAILURE);
+		case 'd': // database 
+			dbs=calloc(strlen((char*)optarg)+1,sizeof(char));
+			strncpy(dbs,(char*)optarg,strlen((char*)optarg));
+			break;
+		case 't':
+			tdir=calloc(strlen((char*)optarg)+1,sizeof(char));
+			strncpy(tdir,(char*)optarg,strlen((char*)optarg));
+			break;
+		case 'a':
+			alfile=calloc(strlen((char*)optarg)+1,sizeof(char));
+			strncpy(alfile,(char*)optarg,strlen((char*)optarg));
+			break;
+		case 'p': // port
+			listenport=atoi(optarg);
+			break;
+		case 'n': // number of threads
+			numthreads=atoi(optarg);
+			break;
+		case 'v': // verbose
+			vlevel++;
+			break;
+		case 'h': // help
+			usage(NULL,EXIT_SUCCESS);
+			break;
+		default: // fallthrough
+			usage(NULL,EXIT_FAILURE);
 		}
 	}
 
 	// validation
-	if(dbfile==NULL) {
-		usage("Must specify db file\n",EXIT_FAILURE);
+	if(dbs==NULL) {
+		usage("Must give a db spec\n",EXIT_FAILURE);
 	} else {
-		LOG_DEBUG(vlevel, "Using database file: %s\n",dbfile);
+		LOG_DEBUG(vlevel, "Using database spec: %s\n",dbs);
 	}
 
 	if(alfile!=NULL) {
@@ -436,37 +445,56 @@ int main(int argc, char **argv) {
 		tmpldata[TMPL_ERROR]=TMPL_ERROR_DFL;
 	}
 
-
 	// db mod setup
 	dlerror(); // clear out the errors
-	dlh=dlopen("./libmod_sqlite.so", RTLD_LAZY);
-	if((dle=dlerror())!=NULL) {
-		LOG_FATAL(vlevel, "dlopen() libmod_sqlite.so: %s\n",dle);
+	if(strstr(dbs,":")==NULL) {
+		LOG_FATAL(vlevel,"Invalid database specification: %s\n", dbs);
 		exit(EXIT_FAILURE);
-	}
-	*(void**)(&db_init)=dlsym(dlh, "db_init");
-	if((dle=dlerror())!=NULL) {
-		LOG_FATAL(vlevel, "dlsym() db_init: %s\n",dle);
-		exit(EXIT_FAILURE);
-	}
-	*(void**)(&db_select)=dlsym(dlh, "db_select");
-	if((dle=dlerror())!=NULL) {
-		LOG_FATAL(vlevel, "dlsym() db_select: %s\n",dle);
-		exit(EXIT_FAILURE);
-	}
-	*(void**)(&db_insert)=dlsym(dlh, "db_insert");
-	if((dle=dlerror())!=NULL) {
-		LOG_FATAL(vlevel, "dlsym() db_insert: %s\n",dle);
-		exit(EXIT_FAILURE);
-	}
-	*(void**)(&db_shutdown)=dlsym(dlh, "db_shutdown");
-	if((dle=dlerror())!=NULL) {
-		LOG_FATAL(vlevel, "dlsym() db_shutdown: %s\n",dle);
-		exit(EXIT_FAILURE);
-	}
-	dlerror();
+	} else {
+		int n=0;
+		char *mn=calloc(strlen(dbs), sizeof(char));
+		char *cf=calloc(strlen(dbs), sizeof(char));
+		char *lf=NULL;
+		while(dbs[n]!=':') {
+			n++;
+		}
+		memcpy(mn,dbs,n);
+		memcpy(cf,dbs+n+1, strlen(dbs)-n);
 
-	db_init(&dbh, dbfile, vlevel);
+		lf=calloc(strlen(mn)+11,sizeof(char));
+		sprintf(lf,"./libmod_%s.so",mn);
+
+		dlh=dlopen(lf, RTLD_LAZY);
+		if((dle=dlerror())!=NULL) {
+			LOG_FATAL(vlevel, "dlopen() libmod_sqlite.so: %s\n",dle);
+			exit(EXIT_FAILURE);
+		}
+		*(void**)(&db_init)=dlsym(dlh, "db_init");
+		if((dle=dlerror())!=NULL) {
+			LOG_FATAL(vlevel, "dlsym() db_init: %s\n",dle);
+			exit(EXIT_FAILURE);
+		}
+		*(void**)(&db_select)=dlsym(dlh, "db_select");
+		if((dle=dlerror())!=NULL) {
+			LOG_FATAL(vlevel, "dlsym() db_select: %s\n",dle);
+			exit(EXIT_FAILURE);
+		}
+		*(void**)(&db_insert)=dlsym(dlh, "db_insert");
+		if((dle=dlerror())!=NULL) {
+			LOG_FATAL(vlevel, "dlsym() db_insert: %s\n",dle);
+			exit(EXIT_FAILURE);
+		}
+		*(void**)(&db_shutdown)=dlsym(dlh, "db_shutdown");
+		if((dle=dlerror())!=NULL) {
+			LOG_FATAL(vlevel, "dlsym() db_shutdown: %s\n",dle);
+			exit(EXIT_FAILURE);
+		}
+		dlerror();
+		if(db_init(&dbh, cf, vlevel)) {
+			LOG_FATAL(vlevel,"Error initializing database\n");
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	// set mgoptions - XXX this needs to be handled better
 	lpstr=calloc(7,sizeof(char));
@@ -502,7 +530,7 @@ int main(int argc, char **argv) {
 			sleep(1);
 		}
 		LOG_DEBUG(vlevel, "Ending Mongoose HTTP server loop\n");
- 	 mg_stop(ctx);
+		mg_stop(ctx);
 	} else {
 		LOG_FATAL(vlevel,"Error in creating Mongoose HTTP server\n");
 	}
@@ -512,14 +540,12 @@ int main(int argc, char **argv) {
 
 	LOG_DEBUG(vlevel, "Cleaning up\n");
 	dlclose(dlh);
-	free(dbfile);
+	free(dbs);
 	free(lpstr);
 	free(ntstr);
 	free(mgoptions);
 	free(tdir);
 	free(tmpldata);
-
+	
 	return EXIT_SUCCESS;
 }
-
-
