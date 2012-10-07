@@ -459,23 +459,25 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	} else {
 		int n=0;
-		char *mn=calloc(strlen(dbs), sizeof(char));
-		char *cf=calloc(strlen(dbs), sizeof(char));
+		char *mn; 
+		char *cf; 
 		char *lf=NULL;
 		while(dbs[n]!=':') {
 			n++;
 		}
-		memcpy(mn,dbs,n);
-		memcpy(cf,dbs+n+1, strlen(dbs)-n);
+		dbs[n]=0;
+		mn=dbs;
+		cf=dbs+n+1;
 
 		lf=calloc(strlen(mn)+11,sizeof(char));
 		sprintf(lf,"./libmod_%s.so",mn);
 
 		dlh=dlopen(lf, RTLD_LAZY);
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlopen() libmod_sqlite.so: %s\n",dle);
+			LOG_FATAL(vlevel, "dlopen() %s: %s\n", lf, dle);
 			exit(EXIT_FAILURE);
 		}
+		free(lf);
 		*(void**)(&db_init)=dlsym(dlh, "db_init");
 		if((dle=dlerror())!=NULL) {
 			LOG_FATAL(vlevel, "dlsym() db_init: %s\n",dle);
@@ -497,6 +499,7 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		dlerror();
+		LOG_DEBUG(vlevel, "Initializing database using config: %s\n", cf);
 		if(db_init(&dbh, cf, vlevel)) {
 			LOG_FATAL(vlevel,"Error initializing database\n");
 			exit(EXIT_FAILURE);

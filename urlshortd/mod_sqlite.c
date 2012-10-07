@@ -34,6 +34,7 @@ int vlevel=3;
 int db_init(dbhandle **dbh, char *conf, int vl) {
 	vlevel=vl;
 
+	LOG_DEBUG(vlevel, "Opening SQLite database using %s as data file\n", conf);
 	*dbh=calloc(sizeof(dbhandle),1);
 	if(sqlite3_open(conf,&((*dbh)->handle)))  {
 		LOG_FATAL(vlevel, "Failed to open database: %s: %s\n",conf, sqlite3_errmsg((*dbh)->handle));
