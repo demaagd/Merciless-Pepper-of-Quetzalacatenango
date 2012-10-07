@@ -1,0 +1,11 @@
+<HTML>
+<HEAD>
+<TITLE>tiny shortener</TITLE>
+</HEAD>
+<BODY>
+<FORM ACTION='/n/' METHOD='GET'>
+URI: <INPUT TYPE='TEXT' NAME='u'>
+<INPUT TYPE='SUBMIT' VALUE='Submit'>
+</FORM>
+</BODY>
+</HTML>

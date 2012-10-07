@@ -1,0 +1,8 @@
+<HTML>
+<HEAD>
+<TITLE>tiny shortener</TITLE>
+</HEAD>
+<BODY>
+New link submitted: <A HREF='{ULINK}'>{ULINK}</A> -> <A HREF='{RLINK}'>{RLINK}</A>
+</BODY>
+</HTML>

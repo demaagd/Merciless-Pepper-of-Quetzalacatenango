@@ -1,0 +1,30 @@
+Overview
+--------
+
+Ever wanted a private/internal URL shortening service without all of the overhead of the framework-de-jour, then you're in luck - urlshortd was written to be a fast, simple, modular solution to passing around long URLs.  
+
+It is written in fairly straight C, with as few uncommon dependancies as I could get away with.  
+
+Compiling
+---------
+
+urlshortd is compiled via cmake (http://www.cmake.org/) and was initially written under Debian GNU/Linux.  
+
+Simply check out the source code, cd <checkoutdir>/Release, and run ./b 
+
+This will create the binary and database backends for you.  This is all that is really needed.  The templates are nice (but it has stubs that will work in many cases), but not required. Copy these files to where you wish to run them from, and execute.  For example:
+
+./urlshortd -d /tmp/db -n 10 -p 10000 -t ../templates/
+
+Will tell it to use the SQLite back end (the only functional backend, in fact it is hardcoded in as of 20121006), 10 threads, listening on port 10000 and use templates from ../templates (this is running straight from the Release dir).  Woosh, Bob's your uncle.  
+
+
+Copyright
+---------
+
+(C) Dave DeMaagd, demaagd@gmail.com or demaagd@mspinynorm.org, 2012
+
+For more information, see the LICENSE file.  
+
+Includes code from mongoose, https://github.com/valenok/mongoose, used per terms listed in https://github.com/valenok/mongoose/blob/master/LICENSE as of 20121004 (see LICENSE-mongoose)
+
