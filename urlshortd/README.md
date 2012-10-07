@@ -14,9 +14,16 @@ Simply check out the source code, cd <checkoutdir>/Release, and run ./b
 
 This will create the binary and database backends for you.  This is all that is really needed.  The templates are nice (but it has stubs that will work in many cases), but not required. Copy these files to where you wish to run them from, and execute.  For example:
 
-./urlshortd -d /tmp/db -n 10 -p 10000 -t ../templates/
+./urlshortd -d sqlite:/tmp/db -n 10 -p 10000 -t ../templates/
 
-Will tell it to use the SQLite back end (the only functional backend, in fact it is hardcoded in as of 20121006), 10 threads, listening on port 10000 and use templates from ../templates (this is running straight from the Release dir).  Woosh, Bob's your uncle.  
+Will tell it to use the SQLite back end (the only functional backend, MySQL and PostgreSQL are only stubs, would also like to do LevelDB as well), 10 threads, listening on port 10000 and use templates from ../templates (this is running straight from the Release dir uing the parent dir templates).  Woosh, Bob's your uncle.  
+
+To Do
+-----
+- Database backends: MySQL, PostgreSQL, LevelDB, at least take a stab at them
+- DB specific config help
+- Some error case handling needs cleanup
+- Change port spec to just let mongoose handle it (it looks to be able to handle more than a straight port-as-string
 
 
 Copyright
