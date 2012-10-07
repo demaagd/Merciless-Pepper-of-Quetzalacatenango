@@ -29,7 +29,7 @@ To Do
 Copyright
 ---------
 
-(C) Dave DeMaagd, demaagd@gmail.com or demaagd@mspinynorm.org, 2012
+(C) Dave DeMaagd, demaagd@gmail.com or demaagd@spinynorm.org, 2012
 
 For more information, see the LICENSE file.  
 
