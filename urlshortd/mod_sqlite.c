@@ -44,7 +44,7 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 	}
 
 	LOG_DEBUG(vlevel, "Checking schema on DB\n");	
-	if(sqlite3_exec((*dbh)->handle,"CREATE TABLE IF NOT EXISTS 'urlshortd' (hash TEXT PRIMARY KEY, uri TEXT, expires INTEGER)",0,0,0)) {
+	if(sqlite3_exec((*dbh)->handle,"CREATE TABLE IF NOT EXISTS 'urlshortd' (hash TEXT PRIMARY KEY, uri TEXT)",0,0,0)) {
 		LOG_FATAL(vlevel, "Error creating table in database: %s: %s\n", conf, sqlite3_errmsg((*dbh)->handle));
 		return 2;
 	}
@@ -52,16 +52,16 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 	return 0;	
 }
 
-int db_insert(dbhandle **dbh, char *key, char *val, int exp) {
+int db_insert(dbhandle **dbh, char *key, char *val) {
 	int ret=0;
 	sqlite3_stmt *dbins;
 	LOG_DEBUG(vlevel, "Creating prepared statement: insert\n");
-	if(sqlite3_prepare((*dbh)->handle, "INSERT INTO urlshortd VALUES(?,?,?)", -1, &dbins, 0)) {
+	if(sqlite3_prepare((*dbh)->handle, "INSERT INTO urlshortd VALUES(?,?)", -1, &dbins, 0)) {
 		LOG_FATAL(vlevel, "Error creating insert prepared statement: %s\n", sqlite3_errmsg((*dbh)->handle));
 		exit(EXIT_FAILURE);
 	}
 
-	LOG_DEBUG(vlevel, "Insert request: %s: %s %i\n",val, key, exp);
+	LOG_DEBUG(vlevel, "Insert request: %s: %s\n",val, key);
 
 	if(sqlite3_bind_text(dbins, 1, key, strlen(key), SQLITE_STATIC)!=SQLITE_OK) {
 		LOG_ERROR(vlevel, "Error binding hash value: %s: %s\n",key, sqlite3_errmsg((*dbh)->handle));
@@ -69,10 +69,6 @@ int db_insert(dbhandle **dbh, char *key, char *val, int exp) {
 	}
 	if(sqlite3_bind_text(dbins, 2, val, strlen(val), SQLITE_STATIC)) {
 		LOG_ERROR(vlevel, "Error binding query string value: %s: %s\n", val, sqlite3_errmsg((*dbh)->handle));
-		ret=2;
-	}
-	if(sqlite3_bind_int(dbins, 3, exp)) {
-		LOG_ERROR(vlevel, "Error binding times tamp value: %i: %s\n",exp, sqlite3_errmsg((*dbh)->handle));
 		ret=2;
 	}
 

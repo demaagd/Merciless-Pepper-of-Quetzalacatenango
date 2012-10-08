@@ -34,7 +34,7 @@ int db_init(dbhandle **dbh, char *conf) {
 	return 0;	
 }
 
-int db_insert(dbhandle **dbh, char *key, char *val, int exp) {
+int db_insert(dbhandle **dbh, char *key, char *val) {
 	
 	return 0;
 }

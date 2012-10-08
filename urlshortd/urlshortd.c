@@ -46,7 +46,7 @@ int vlevel=0;
 
 void *dbh; 
 int (*db_init)(void **dbh, char *conf, int vl);
-int (*db_insert)(void **dbh, char *key, char *val, int exp);
+int (*db_insert)(void **dbh, char *key, char *val);
 int (*db_select)(void **dbh, char *key, char **ret);
 int (*db_shutdown)(void **dbh);
 
@@ -244,11 +244,10 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			char *tu;
 			char *tr;
 			char *requrl;
-			struct timeval now;
 			LOG_DEBUG(vlevel, "Looks like a new insert request: %s\n",request_info->query_string);
 
 			mg_md5(hash, (char*)(request_info->query_string)+2, NULL);
-			if(db_insert(&dbh, hash, (char*)(request_info->query_string)+2, (int)(now.tv_sec))) {
+			if(db_insert(&dbh, hash, (char*)(request_info->query_string)+2)) {
 				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Unable to insert, maybe a duplicate?");
 				mg_printf(conn,
 									"HTTP/1.1 200 OK\r\n"

@@ -58,7 +58,7 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 	return 0;	
 }
 
-int db_insert(dbhandle **dbh, char *key, char *val, int exp) {
+int db_insert(dbhandle **dbh, char *key, char *val) {
 
 	leveldb_put((*dbh)->dbh, (*dbh)->wopt, key, strlen(key), val, strlen(val), &((*dbh)->errptr));
 	if((*dbh)->errptr!=NULL) {
