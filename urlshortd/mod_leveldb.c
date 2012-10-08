@@ -77,6 +77,10 @@ int db_select(dbhandle **dbh, char *key, char **ret) {
 		LOG_ERROR("leveldb_get() error: '%s': %s\n",key,(*dbh)->errptr);
 		return 1; 
 	}
+	if(klen==0) {
+		*ret=NULL;
+		return 1;
+	}
 	*ret=calloc(klen+2,sizeof(char));
 	snprintf(*ret,klen+1,"%s",tmp);
 
