@@ -2,7 +2,7 @@ project (urlshortd)
 cmake_minimum_required (VERSION 2.4)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall")
-set(CMAKE_CSS_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 
 include (mysql.cmake)
 include (postgresql.cmake)
@@ -35,8 +35,8 @@ if(LEVELDB_FOUND)
 	target_link_libraries(mod_leveldb ${LEVELDB_LIBRARIES})
 endif(LEVELDB_FOUND)
 
-add_executable (urlshortd urlshortd.c util.h tmpldfl.h mongoose.c mongoose.h)
-target_link_libraries (urlshortd ${SQLITE3_LIBRARIES})
+add_executable (urlshortd urlshortd.c util.c util.h tmpldfl.h mongoose.c mongoose.h)
+target_link_libraries (urlshortd dl pthread)
 
 INSTALL(TARGETS urlshortd DESTINATION urlshortd)
 
