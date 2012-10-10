@@ -177,7 +177,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 				free(respurl);
 			}
 			free(hash);
-		} else if (ishash(req+1)) { // redirect
+		} else if (ishash(req+1) && strlen(req+1)==32) { // redirect
 			char *uri=NULL, *uridec;
 			//char *redir=NULL;
 			LOG_DEBUG(vlevel, "Looks like a hash, should check DB: %s\n",req);
