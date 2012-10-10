@@ -31,11 +31,18 @@
 #include "util.h"
 
 char *fmmap(char *base, char *file) {
-	char *tf=calloc(strlen(base)+strlen(file)+3,sizeof(char));
+	char *tf=NULL;
 	char *ret=NULL;
 	struct stat ts;
-	sprintf(tf,"%s/%s",base,file);
-	LOG_DEBUG(vlevel,"Looking for file: %s in %s: %s\n",file, base, tf);
+
+	if(file!=NULL) {
+		tf=calloc(strlen(base)+strlen(file)+3,sizeof(char));
+		sprintf(tf,"%s/%s",base,file);
+	} else {
+		tf=base;
+	}
+
+	LOG_DEBUG(vlevel,"Looking for file %s\n", tf);
 	if(stat(tf,&ts)==0) {
 		if(S_ISREG(ts.st_mode) && (S_IRUSR & ts.st_mode)) {
 			ret=mmap(0, ts.st_size, PROT_READ, MAP_SHARED, open(tf, O_RDONLY), 0);
@@ -51,7 +58,9 @@ char *fmmap(char *base, char *file) {
 		LOG_ERROR(vlevel,"Unable to stat %s: %i %s\n",tf, errno, strerror(errno));
 		ret=NULL;
 	}
-	free(tf);
+	if(file!=NULL) {
+		free(tf);
+	}
 	return ret;
 }
 // url_decode() is ripped out of mongoose.c, was too useful to bother rewriting, didn't want to mess with the .h...  Maybe I should address that
@@ -132,4 +141,13 @@ char *strreplace(const char* instr, char *sstr, char *dstr) {
 	free(rsstr);
 	free(ridx);
 	return ret;
+}
+
+void jsondequote(char **jstr) {
+	int n;
+	int jl=strlen(*jstr);
+	while(n<jl-1) {
+		*jstr[n]=*jstr[n+1];
+		n++;
+	}
 }
