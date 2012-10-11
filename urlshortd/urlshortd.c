@@ -105,10 +105,10 @@ int ishash(char* str) {
 static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 	const struct mg_request_info *request_info = mg_get_request_info(conn);
 	if (event == MG_NEW_REQUEST) {
-		char *req=calloc(128,sizeof(char));
+		char *req=calloc(URL_STRING_MAX+1,sizeof(char));
 		struct in_addr saddr;
 
-		strncpy(req,request_info->uri, 127);
+		strncpy(req,request_info->uri, URL_STRING_MAX);
  		saddr.s_addr = ntohl(request_info->remote_ip);
 
 		LOG_DEBUG(vlevel, "Connection from: %s, request: %s\n", inet_ntoa(saddr), req);

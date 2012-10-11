@@ -31,6 +31,8 @@ int url_decode(const char *src, size_t src_len, char *dst, size_t dst_len, int i
 void jsondequote(char **jstr);
 
 #define SHORT_STRING_MAX 512 
+#define URL_STRING_MAX 8192
+
 #define LOG_LVL_TRACE 4
 #define LOG_LVL_DEBUG 3
 #define LOG_LVL_INFO 2
