@@ -35,8 +35,9 @@ typedef struct {
 } dbhandle;
 
 int db_init(dbhandle **dbh, char *conf, int vl) {
-	char *cfgjson=fmmap(conf,NULL);
+	char *cfgjson;
 	struct json_object *cfgjsonobj;
+	struct json_object *tj;
 
 	char *t;
 	
@@ -48,29 +49,47 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 	
 	vlevel=vl;
 
+	if(access(conf,F_OK|R_OK)) {
+		LOG_FATAL(vlevel, "Config file missing or not readable: %s: %i %s\n", conf, errno, strerror(errno));
+		return 1;
+	}
+	cfgjson=fmmap(conf,NULL);
+
 	LOG_DEBUG(vlevel,"Loading MySQL connection info from %s\n",conf);
 	cfgjsonobj=json_tokener_parse(cfgjson);
-	t=(char*)json_object_to_json_string(json_object_object_get(cfgjsonobj, "hostname"));
+
+
+	tj=json_object_object_get(cfgjsonobj, "hostname");
+	t=(char*)json_object_to_json_string(tj);
 	hostname=calloc(strlen(t),sizeof(char));
 	snprintf(hostname,strlen(t)-1,"%s",t+1);
+	json_object_put(tj);	
 	LOG_DEBUG(vlevel, "MySQL hostname: %s\n", hostname);
 
-	port=json_object_get_int(json_object_object_get(cfgjsonobj, "port"));
+	tj=json_object_object_get(cfgjsonobj, "port");
+	port=json_object_get_int(tj);
+	json_object_put(tj);	
 	LOG_DEBUG(vlevel, "MySQL port: %i\n", port);
 
-	t=(char*)json_object_to_json_string(json_object_object_get(cfgjsonobj, "database"));
+	tj=json_object_object_get(cfgjsonobj, "database");
+	t=(char*)json_object_to_json_string(tj);
 	database=calloc(strlen(t),sizeof(char));
 	snprintf(database,strlen(t)-1,"%s",t+1);
+	json_object_put(tj);	
 	LOG_DEBUG(vlevel, "MySQL database: %s\n", database);
 
-	t=(char*)json_object_to_json_string(json_object_object_get(cfgjsonobj, "username"));
+	tj=json_object_object_get(cfgjsonobj, "username");
+	t=(char*)json_object_to_json_string(tj);
 	username=calloc(strlen(t),sizeof(char));
 	snprintf(username,strlen(t)-1,"%s",t+1);
+	json_object_put(tj);	
 	LOG_DEBUG(vlevel, "MySQL username: %s\n", username);
 
-	t=(char*)json_object_to_json_string(json_object_object_get(cfgjsonobj, "password"));
+	tj=json_object_object_get(cfgjsonobj, "password");
+	t=(char*)json_object_to_json_string(tj);
 	password=calloc(strlen(t),sizeof(char));
 	snprintf(password,strlen(t)-1,"%s",t+1);
+	json_object_put(tj);	
 	LOG_DEBUG(vlevel, "MySQL password: %s\n", password);
 
 	*dbh=calloc(sizeof(dbhandle),1);	
@@ -86,6 +105,11 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 		return mysql_errno((*dbh)->handle);
 	}
 
+	free(hostname);
+	free(database);
+	free(username);
+	free(password);
+	//json_object_put(cfgjsonobj);
 	return 0;	
 }
 
@@ -95,6 +119,8 @@ int db_insert(dbhandle **dbh, char *key, char *val) {
 
 	unsigned long kl = strlen(key);
 	unsigned long vl = strlen(val);
+
+	int ret=0;
 
 	if(sth == NULL) {
 		LOG_FATAL(vlevel, "Unable to create statement handle %i %s\n", mysql_errno((*dbh)->handle), mysql_error((*dbh)->handle));
@@ -121,19 +147,18 @@ int db_insert(dbhandle **dbh, char *key, char *val) {
 
 	if(mysql_stmt_bind_param(sth, param) != 0) {
 		LOG_FATAL(vlevel, "Unable to bind parameters %i %s\n", mysql_errno((*dbh)->handle), mysql_error((*dbh)->handle));
-		return 1;
+		ret=1;
+	} else {
+		LOG_DEBUG(vlevel, "MySQL running statement\n");
+		if(mysql_stmt_execute(sth) != 0) {
+			LOG_FATAL(vlevel, "Unable to execute statement %i %s\n", mysql_errno((*dbh)->handle), mysql_error((*dbh)->handle));
+			ret=1;
+		}
 	}
-
-	LOG_DEBUG(vlevel, "MySQL running statement\n");
-	if(mysql_stmt_execute(sth) != 0) {
-		LOG_FATAL(vlevel, "Unable to execute statement %i %s\n", mysql_errno((*dbh)->handle), mysql_error((*dbh)->handle));
-		return 1;
-	}
-
 	mysql_stmt_free_result(sth);
 	mysql_stmt_close(sth);
 
-	return 0;
+	return ret;
 }
 
 int db_select(dbhandle **dbh, char *key, char **ret) {
@@ -153,12 +178,12 @@ int db_select(dbhandle **dbh, char *key, char **ret) {
 	}
 
 	mysql_free_result(result);
-
+	free (q);
 	return 0;
 }
 
 int db_shutdown(dbhandle **dbh) {
   mysql_close((*dbh)->handle);
-
+	free(*dbh);
 	return 0;
 }
