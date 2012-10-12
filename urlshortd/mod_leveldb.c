@@ -94,6 +94,7 @@ int db_shutdown(dbhandle **dbh) {
   leveldb_writeoptions_destroy((*dbh)->wopt);
   leveldb_compact_range((*dbh)->dbh, NULL, 0, NULL, 0);
   leveldb_close((*dbh)->dbh);
+	free(*dbh);
 
 	return 0;
 }

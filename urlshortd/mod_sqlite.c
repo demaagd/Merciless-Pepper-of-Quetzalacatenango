@@ -109,5 +109,6 @@ int db_select(dbhandle **dbh, char *key, char **ret) {
 
 int db_shutdown(dbhandle **dbh) {
 	sqlite3_close((*dbh)->handle);
+	free(*dbh);
 	return 0;
 }
