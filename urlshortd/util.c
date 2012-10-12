@@ -124,7 +124,7 @@ char *strreplace(const char* instr, char *sstr, char *dstr) {
 			instridx=0;
 			dstridx=0;
 			ridxidx=0;
-			while(instridx<instrlen) {
+			while(instridx<instrlen-1) {
 				if(instridx==ridx[ridxidx]) {
 					memcpy(ret+dstridx,dstr,dstrlen);
 					instridx+=rsstrlen;
