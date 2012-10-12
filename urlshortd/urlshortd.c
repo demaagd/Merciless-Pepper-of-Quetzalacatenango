@@ -197,7 +197,6 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									"Redirect to: %s\r\n",
 									(int)strlen((char*)uridec)+15, (char*)uridec, (char*)uridec);
 				free(uridec);
-				free(uri);
 			} else {
 				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Don't think that is a valid redirect");
 				mg_printf(conn,
@@ -209,6 +208,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									(int)strlen(errresp), errresp);
 				free(errresp);
 			}
+			free(uri);
 		} else { // other
 			char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Not sure what you meant by that...");
 			mg_printf(conn,
@@ -356,7 +356,9 @@ int main(int argc, char **argv) {
 		int n=0;
 		char *mn; 
 		char *cf; 
-		char *lf=NULL;
+		char *lf;
+
+		lf=calloc(strlen(dbs),sizeof(char));
 		while(dbs[n]!=':') {
 			n++;
 		}
@@ -364,7 +366,6 @@ int main(int argc, char **argv) {
 		mn=dbs;
 		cf=dbs+n+1;
 
-		lf=calloc(strlen(mn)+11,sizeof(char));
 		sprintf(lf,"./libmod_%s.so",mn);
 
 		dlh=dlopen(lf, RTLD_LAZY);
@@ -441,7 +442,6 @@ int main(int argc, char **argv) {
 	}
 	LOG_DEBUG(vlevel, "Closing database handle\n");
 	db_shutdown(&dbh);
-	free(dbh);
 
 	LOG_DEBUG(vlevel, "Cleaning up\n");
 	dlclose(dlh);
