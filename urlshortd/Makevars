@@ -1,0 +1,5 @@
+DOMAIN = urlshortd
+
+XGETTEXT_OPTIONS = --keyword=_ 
+MSGID_BUGS_ADDRESS = demaagd@gmail.com
+COPYRIGHT_HOLDER = Dave DeMaagd

@@ -10,3 +10,6 @@ lib*.so
 *deb
 _CPack_Packages
 install_manifest.txt
+*gmo
+*po
+*pot

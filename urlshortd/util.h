@@ -21,9 +21,15 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__ 
 
-extern int vlevel;
-
 #include <time.h>
+#include <libintl.h>
+#include <locale.h>
+
+#ifndef _
+#define _(STRING)    gettext(STRING)
+#endif
+
+extern int vlevel;
 
 char *fmmap(char *base, char *file);
 char *strreplace(const char* instr, char *sstr, char *dstr);

@@ -1,6 +1,8 @@
 PROJECT(urlshortd)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.4)
 
+SET(GettextTranslate_ALL "1")
+
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 
@@ -8,6 +10,7 @@ INCLUDE(CPack)
 INCLUDE(mysql.cmake)
 INCLUDE(postgresql.cmake)
 INCLUDE(leveldb.cmake)
+INCLUDE(GettextTranslate.cmake)
 
 FIND_PACKAGE (PkgConfig REQUIRED)
 PKG_CHECK_MODULES(SQLITE3 sqlite3)
@@ -45,3 +48,5 @@ INSTALL(TARGETS urlshortd DESTINATION urlshortd)
 SET(CPACK_GENERATOR "DEB")
 SET(CPACK_GENERATOR "RPM")
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dave DeMaagd") #required
+
+GettextTranslate()

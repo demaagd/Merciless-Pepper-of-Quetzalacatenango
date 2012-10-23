@@ -60,7 +60,8 @@ char **tmpldata;
 
 void usage(char *err, int ec) {
 	if(err!=NULL) {
-		fprintf(stderr,"Error: %s\n\n",err);
+		fprintf(stderr,_("Error: %s\n"),err);
+		fprintf(stderr,"\n");
 	}
 	fprintf(stderr,"Usage:\n"
 					" -d database definition -- Specifies database connection to use, module:/path/to/file\n"
@@ -80,7 +81,7 @@ void handlesig(int sig) {
 		if(done) {
 			exit(EXIT_FAILURE);
 		} else {
-			LOG_DEBUG(vlevel, "Finishing...\n");
+			LOG_DEBUG(vlevel, gettext("Finishing...\n"));
 			done=1; 
 		}
 	}
@@ -247,6 +248,9 @@ int main(int argc, char **argv) {
 
 	signal(SIGINT,handlesig);
   signal(SIGTERM,handlesig);
+
+  setlocale(LC_ALL, "");
+  textdomain("urlshortd");
 
 	// command line parsing
 	while ((goopt=getopt (argc, argv, "d:p:n:a:t:vh")) != -1) {
