@@ -6,3 +6,5 @@ CPackSourceConfig.cmake
 lib*.so 
 Makefile 
 tiny
+POTFILES
+LINGUAS
