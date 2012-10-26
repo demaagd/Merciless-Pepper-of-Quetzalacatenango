@@ -63,15 +63,15 @@ void usage(char *err, int ec) {
 		fprintf(stderr,_("Error: %s\n"),err);
 		fprintf(stderr,"\n");
 	}
-	fprintf(stderr,"Usage:\n"
-					" -d database definition -- Specifies database connection to use, module:/path/to/file\n"
-					" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"
-					" -n N                   -- Number of HTTP serving threads (default: 10)\n"
-					" -a /path/to/accessfile -- Access log file, must be writable (if it exists) or in a writable dir (if it does not exist, it will be created)\n"
-					" -t /path/to/templates  -- Template directory\n"
-					" -v                     -- Increases verbose level, can be specified multiple times\n"
-					" -h                     -- This help listing\n"
-);
+
+	fprintf(stderr,_("Usage (v%i.%i.%i):\n"),urlshortd_VERSION_MAJOR,urlshortd_VERSION_MINOR,urlshortd_VERSION_REV);
+	fprintf(stderr,_(" -d database definition -- Specifies database connection to use, module:/path/to/file\n"));
+	fprintf(stderr,_(" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"));
+	fprintf(stderr,_(" -n N                   -- Number of HTTP serving threads (default: 10)\n"));
+	fprintf(stderr,_(" -a /path/to/accessfile -- Access log file, must be writable (if it exists) or in a writable dir (if it does not exist, it will be created)\n"));
+	fprintf(stderr,_(" -t /path/to/templates  -- Template directory\n"));
+	fprintf(stderr,_(" -v                     -- Increases verbose level, can be specified multiple times\n"));
+	fprintf(stderr,_(" -h                     -- This help listing\n"));
 
 	exit(ec);
 }
@@ -81,7 +81,7 @@ void handlesig(int sig) {
 		if(done) {
 			exit(EXIT_FAILURE);
 		} else {
-			LOG_DEBUG(vlevel, gettext("Finishing...\n"));
+			LOG_DEBUG(vlevel, _("Finishing...\n"));
 			done=1; 
 		}
 	}
@@ -112,7 +112,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 		strncpy(req,request_info->uri, URL_STRING_MAX);
  		saddr.s_addr = ntohl(request_info->remote_ip);
 
-		LOG_DEBUG(vlevel, "Connection from: %s, request: %s\n", inet_ntoa(saddr), req);
+		LOG_DEBUG(vlevel, _("Connection from: %s, request: %s\n"), inet_ntoa(saddr), req);
 		if(strncmp(req, "/status\0", 8) == 0) { // status
 			// XXX how to get more status 
 			char *status=strreplace(tmpldata[TMPL_STATUS],"STATUS","OK");
@@ -141,11 +141,11 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			char *tu;
 			char *tr;
 			char *requrl;
-			LOG_DEBUG(vlevel, "Looks like a new insert request: %s\n",request_info->query_string);
+			LOG_DEBUG(vlevel, _("Looks like a new insert request: %s\n"),request_info->query_string);
 
 			mg_md5(hash, (char*)(request_info->query_string)+2, NULL);
 			if(db_insert(&dbh, hash, (char*)(request_info->query_string)+2)) {
-				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Unable to insert, maybe a duplicate?");
+				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE",_("Unable to insert, maybe a duplicate?"));
 				mg_printf(conn,
 									"HTTP/1.1 200 OK\r\n"
 									"Content-Type: text/html\r\n"
@@ -199,7 +199,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									(int)strlen((char*)uridec)+15, (char*)uridec, (char*)uridec);
 				free(uridec);
 			} else {
-				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Don't think that is a valid redirect");
+				char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE",_("Don't think that is a valid redirect"));
 				mg_printf(conn,
 									"HTTP/1.1 200 OK\r\n"
 									"Content-Type: text/html\r\n"
@@ -211,7 +211,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			}
 			free(uri);
 		} else { // other
-			char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE","Not sure what you meant by that...");
+			char *errresp=strreplace(tmpldata[TMPL_ERROR],"MESSAGE",_("Not sure what you meant by that..."));
 			mg_printf(conn,
 								"HTTP/1.1 200 OK\r\n"
 								"Content-Type: text/html\r\n"
@@ -288,50 +288,50 @@ int main(int argc, char **argv) {
 	if(dbs==NULL) {
 		usage("Must give a db spec\n",EXIT_FAILURE);
 	} else {
-		LOG_DEBUG(vlevel, "Using database spec: %s\n",dbs);
+		LOG_DEBUG(vlevel, _("Using database spec: %s\n"),dbs);
 	}
 
 	if(alfile!=NULL) {
 		if((tf=open(alfile,O_WRONLY|O_CREAT,S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH))==-1) {
-			LOG_FATAL(vlevel,"Unable to open access log file: %s: %s\n", alfile, strerror(errno));
+			LOG_FATAL(vlevel,_("Unable to open access log file: %s: %s\n"), alfile, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		close(tf);
 	}
 	if(alfile!=NULL && access(alfile, W_OK)!=0) {
-		LOG_FATAL(vlevel, "Unable to write to access log file: %s\n",alfile);
+		LOG_FATAL(vlevel, _("Unable to write to access log file: %s\n"),alfile);
 		exit(EXIT_FAILURE);
 	}
 
 	if(listenport<0 || listenport>65536) {
-		LOG_FATAL(vlevel, "Given port out of bounds: %i\n",listenport);
+		LOG_FATAL(vlevel, _("Given port out of bounds: %i\n"),listenport);
 		exit(EXIT_FAILURE);
 	}
 
 	if(numthreads<0 || numthreads>99) {
-		LOG_FATAL(vlevel, "Given threads out of bounds: %i\n",numthreads);
+		LOG_FATAL(vlevel, _("Given threads out of bounds: %i\n"),numthreads);
 		exit(EXIT_FAILURE);
 	}
 
 	// templates
-	LOG_DEBUG(vlevel,"Checking templates\n");
+	LOG_DEBUG(vlevel,_("Checking templates\n"));
 	if(tdir!=NULL) {
-		LOG_DEBUG(vlevel, "Loading templates from %s\n", tdir);
+		LOG_DEBUG(vlevel, _("Loading templates from %s\n"), tdir);
 		tmpldata=calloc(TMPL_ERROR+1,sizeof(char*));
 
-		LOG_DEBUG(vlevel,"Looking for index file\n");
+		LOG_DEBUG(vlevel,_("Looking for index file\n"));
 		tmpldata[TMPL_INDEX]=fmmap(tdir,"index");
 
-		LOG_DEBUG(vlevel,"Looking for status file\n");
+		LOG_DEBUG(vlevel,_("Looking for status file\n"));
 		tmpldata[TMPL_STATUS]=fmmap(tdir,"status");
 
-		LOG_DEBUG(vlevel,"Looking for new file\n");
+		LOG_DEBUG(vlevel,_("Looking for new file\n"));
 		tmpldata[TMPL_NEW]=fmmap(tdir,"new");
 
-		LOG_DEBUG(vlevel,"Looking for list file\n");
+		LOG_DEBUG(vlevel,_("Looking for list file\n"));
 		tmpldata[TMPL_LIST]=fmmap(tdir,"list");
 
-		LOG_DEBUG(vlevel,"Looking for error file\n");
+		LOG_DEBUG(vlevel,_("Looking for error file\n"));
 		tmpldata[TMPL_ERROR]=fmmap(tdir,"error");
 	}
 
@@ -354,7 +354,7 @@ int main(int argc, char **argv) {
 	// db mod setup
 	dlerror(); // clear out the errors
 	if(strstr(dbs,":")==NULL) {
-		LOG_FATAL(vlevel,"Invalid database specification: %s\n", dbs);
+		LOG_FATAL(vlevel,_("Invalid database specification: %s\n"), dbs);
 		exit(EXIT_FAILURE);
 	} else {
 		int n=0;
@@ -374,34 +374,34 @@ int main(int argc, char **argv) {
 
 		dlh=dlopen(lf, RTLD_LAZY);
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlopen() %s: %s\n", lf, dle);
+			LOG_FATAL(vlevel, _("dlopen() %s: %s\n"), lf, dle);
 			exit(EXIT_FAILURE);
 		}
 		free(lf);
 		*(void**)(&db_init)=dlsym(dlh, "db_init");
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlsym() db_init: %s\n",dle);
+			LOG_FATAL(vlevel, _("dlsym() db_init: %s\n"),dle);
 			exit(EXIT_FAILURE);
 		}
 		*(void**)(&db_select)=dlsym(dlh, "db_select");
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlsym() db_select: %s\n",dle);
+			LOG_FATAL(vlevel, _("dlsym() db_select: %s\n"),dle);
 			exit(EXIT_FAILURE);
 		}
 		*(void**)(&db_insert)=dlsym(dlh, "db_insert");
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlsym() db_insert: %s\n",dle);
+			LOG_FATAL(vlevel, _("dlsym() db_insert: %s\n"),dle);
 			exit(EXIT_FAILURE);
 		}
 		*(void**)(&db_shutdown)=dlsym(dlh, "db_shutdown");
 		if((dle=dlerror())!=NULL) {
-			LOG_FATAL(vlevel, "dlsym() db_shutdown: %s\n",dle);
+			LOG_FATAL(vlevel, _("dlsym() db_shutdown: %s\n"),dle);
 			exit(EXIT_FAILURE);
 		}
 		dlerror();
-		LOG_DEBUG(vlevel, "Initializing database using config: %s\n", cf);
+		LOG_DEBUG(vlevel, _("Initializing database using config: %s\n"), cf);
 		if(db_init(&dbh, cf, vlevel)) {
-			LOG_FATAL(vlevel,"Error initializing database\n");
+			LOG_FATAL(vlevel,_("Error initializing database\n"));
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -432,22 +432,22 @@ int main(int argc, char **argv) {
 		mgoptions[6]=NULL;
 	}
 	// main loop
-	LOG_DEBUG(vlevel, "Starting Mongoose HTTP server loop\n");
+	LOG_DEBUG(vlevel, _("Starting Mongoose HTTP server loop\n"));
   ctx = mg_start(&mghandle, NULL, (const char**)mgoptions);
 	if(ctx!=NULL) {
 		while(!done) {
 			// cleaner thread here?
 			sleep(1);
 		}
-		LOG_DEBUG(vlevel, "Ending Mongoose HTTP server loop\n");
+		LOG_DEBUG(vlevel, _("Ending Mongoose HTTP server loop\n"));
 		mg_stop(ctx);
 	} else {
-		LOG_FATAL(vlevel,"Error in creating Mongoose HTTP server\n");
+		LOG_FATAL(vlevel,_("Error in creating Mongoose HTTP server\n"));
 	}
-	LOG_DEBUG(vlevel, "Closing database handle\n");
+	LOG_DEBUG(vlevel, _("Closing database handle\n"));
 	db_shutdown(&dbh);
 
-	LOG_DEBUG(vlevel, "Cleaning up\n");
+	LOG_DEBUG(vlevel, _("Cleaning up\n"));
 	dlclose(dlh);
 	free(dbs);
 	free(lpstr);

@@ -1,12 +1,20 @@
 PROJECT(urlshortd)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.4)
 
+SET(urlshortd_VERSION_MAJOR "0")
+SET(urlshortd_VERSION_MINOR "0")
+SET(urlshortd_VERSION_REV "5")
+
+SET(CPACK_PACKAGE_VERSION "${urlshortd_VERSION_MAJOR}.${urlshortd_VERSION_MINOR}.${urlshortd_VERSION_REV}")
+ADD_DEFINITIONS( -Durlshortd_VERSION_MAJOR=${urlshortd_VERSION_MAJOR} -Durlshortd_VERSION_MINOR=${urlshortd_VERSION_MINOR} -Durlshortd_VERSION_REV=${urlshortd_VERSION_REV})
+
 SET(GettextTranslate_ALL "1")
 
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 
-INCLUDE(CPack)
+SET(LOCALEDIR "/usr/share/locale/")
+
 INCLUDE(mysql.cmake)
 INCLUDE(postgresql.cmake)
 INCLUDE(leveldb.cmake)
@@ -40,13 +48,16 @@ IF(LEVELDB_FOUND)
 	TARGET_LINK_LIBRARIES(mod_leveldb ${LEVELDB_LIBRARIES})
 ENDIF(LEVELDB_FOUND)
 
+INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
 ADD_EXECUTABLE(urlshortd urlshortd.c util.c util.h tmpldfl.h mongoose.c mongoose.h)
 TARGET_LINK_LIBRARIES(urlshortd dl pthread)
 
 INSTALL(TARGETS urlshortd DESTINATION urlshortd)
 
 SET(CPACK_GENERATOR "DEB")
-SET(CPACK_GENERATOR "RPM")
-SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dave DeMaagd") #required
+SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dave DeMaagd")
+SET(CPACK_DEBIAN_PACKAGE_SUGGESTS "libsqlite3-dev (>=3.7.14.1-1), libmysqlclient-dev (>=5.5.24+dfsg-9)")
 
 GettextTranslate()
+
+INCLUDE(CPack)
