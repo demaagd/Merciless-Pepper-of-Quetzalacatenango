@@ -40,18 +40,20 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 	vlevel=vl;
 	*dbh=calloc(sizeof(dbhandle),1);
 
-	LOG_ERROR(vlevel, "Setting up leveldb store in %s\n",conf);
+	LOG_TRACE(vlevel, _("Using leveldb store in %s\n"),conf);
+
+	LOG_TRACE(vlevel, _("Setting up leveldb store in %s\n"),conf);
   (*dbh)->dbopt=leveldb_options_create();
   leveldb_options_set_create_if_missing((*dbh)->dbopt, 1);
   leveldb_options_set_write_buffer_size((*dbh)->dbopt, 8388608);
   (*dbh)->dbh=leveldb_open((*dbh)->dbopt,conf,&((*dbh)->errptr));
   
-	LOG_ERROR(vlevel, "Setting leveldb read options\n");
+	LOG_TRACE(vlevel, _("Setting leveldb read options\n"));
   (*dbh)->ropt = leveldb_readoptions_create();
   leveldb_readoptions_set_verify_checksums((*dbh)->ropt, 1);
   leveldb_readoptions_set_fill_cache((*dbh)->ropt, 0);
 
-	LOG_ERROR(vlevel, "Setting leveldb write options\n");
+	LOG_TRACE(vlevel, _("Setting leveldb write options\n"));
   (*dbh)->wopt = leveldb_writeoptions_create();
   leveldb_writeoptions_set_sync((*dbh)->wopt, 1);
 
@@ -59,10 +61,10 @@ int db_init(dbhandle **dbh, char *conf, int vl) {
 }
 
 int db_insert(dbhandle **dbh, char *key, char *val) {
-
+	LOG_DEBUG(vlevel, _("Inserting '%s' '%s'\n"),key, val);
 	leveldb_put((*dbh)->dbh, (*dbh)->wopt, key, strlen(key), val, strlen(val), &((*dbh)->errptr));
 	if((*dbh)->errptr!=NULL) {
-		LOG_ERROR(vlevel, "leveldb_put() error: '%s', '%s': %s\n",key,val,(*dbh)->errptr);
+		LOG_ERROR(vlevel, "leveldb_put(): '%s', '%s': %s\n",key,val,(*dbh)->errptr);
 		return 1;
 	}
 
@@ -72,9 +74,10 @@ int db_insert(dbhandle **dbh, char *key, char *val) {
 int db_select(dbhandle **dbh, char *key, char **ret) {
 	size_t klen=strlen(key);
 
+	LOG_DEBUG(vlevel, _("Selecting '%s'\n"),key);
 	char *tmp=leveldb_get((*dbh)->dbh, (*dbh)->ropt, key, strlen(key), &klen, &((*dbh)->errptr));
 	if((*dbh)->errptr!=NULL) {
-		LOG_ERROR("leveldb_get() error: '%s': %s\n",key,(*dbh)->errptr);
+		LOG_ERROR("leveldb_get(): '%s': %s\n",key,(*dbh)->errptr);
 		return 1; 
 	}
 	if(klen==0) {
@@ -88,7 +91,7 @@ int db_select(dbhandle **dbh, char *key, char **ret) {
 }
 
 int db_shutdown(dbhandle **dbh) {
-  LOG_DEBUG(vlevel, "Cleaning up leveldb\n");
+  LOG_DEBUG(vlevel, _("Cleaning up leveldb\n"));
   leveldb_options_destroy((*dbh)->dbopt);
   leveldb_readoptions_destroy((*dbh)->ropt);
   leveldb_writeoptions_destroy((*dbh)->wopt);
