@@ -102,7 +102,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 	if(req[n]==':') {
 	  leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
 	  if(errptr!=NULL) {
-	    LOG_ERROR(vlevel,"leveldb_put(): %s\n",errptr);
+	    LOG_ERROR(vlevel,_("leveldb_put(): %s\n"),errptr);
 	    mg_printf(conn,
 		      "HTTP/1.1 500 OK\r\n"
 		      "Content-Type: text/plain\r\n"
@@ -124,7 +124,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 	n--;
       }
       if(n==0) {
-	LOG_ERROR(vlevel,"Malformed request\n");
+	LOG_ERROR(vlevel,_("Malformed request\n"));
 	mg_printf(conn,
 		  "HTTP/1.1 500 OK\r\n"
 		  "Content-Type: text/plain\r\n"
@@ -164,7 +164,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       // XXX
     } else { // other
       // XXX
-      LOG_ERROR(vlevel,"Unknown/unhandled request\n");
+      LOG_ERROR(vlevel,_("Unknown/unhandled request\n"));
     }
     free(req);
     return "";
@@ -250,19 +250,19 @@ int main(int argc, char **argv) {
   }
 
   // XXX - set up leveldb handle
-  LOG_TRACE(vlevel, "Setting up leveldb store in %s\n",dbd);
+  LOG_TRACE(vlevel, _("Setting up leveldb store in %s\n"),dbd);
   dbopt=leveldb_options_create();
   leveldb_options_set_create_if_missing(dbopt, 1);
   leveldb_options_set_write_buffer_size(dbopt, 8388608);
   leveldb_options_set_compression(dbopt,leveldb_no_compression);
   dbh=leveldb_open(dbopt,dbd,&errptr);
 
-  LOG_TRACE(vlevel, "Setting leveldb read options\n");
+  LOG_TRACE(vlevel, _("Setting leveldb read options\n"));
   ropt = leveldb_readoptions_create();
   leveldb_readoptions_set_verify_checksums(ropt, 1);
   leveldb_readoptions_set_fill_cache(ropt, 0);
 
-  LOG_TRACE(vlevel, "Setting leveldb write options\n");
+  LOG_TRACE(vlevel, _("Setting leveldb write options\n"));
   wopt = leveldb_writeoptions_create();
   leveldb_writeoptions_set_sync(wopt, 0);
 
@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
   LOG_TRACE(vlevel, _("Closing database handle\n"));
 
   // close leveldb handle
-  LOG_TRACE(vlevel, "Cleaning up leveldb\n");
+  LOG_TRACE(vlevel, _("Cleaning up leveldb\n"));
   leveldb_compact_range(dbh, NULL, 0, NULL, 0);
 
   leveldb_options_destroy(dbopt);
