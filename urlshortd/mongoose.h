@@ -82,21 +82,6 @@ enum mg_event {
   //   SSL_CTX *ssl_context = request_info->ev_data;
   MG_INIT_SSL,
 
-  // Mongoose tries to open file.
-  // If callback returns non-NULL, Mongoose will not try to open it, but
-  // will use the returned value as a pointer to the file data. This allows
-  // for example to serve files from memory.
-  // ev_data contains file path, including document root path.
-  // Upon return, ev_data should return file size,  which should be a long int.
-  //
-  //   const char *file_name = request_info->ev_data;
-  //   if (strcmp(file_name, "foo.txt") == 0) {
-  //     request_info->ev_data = (void *) (long) 4;
-  //     return "data";
-  //   }
-  //   return NULL;
-  MG_OPEN_FILE,
-
   // Sent on HTTP connect, before websocket handshake.
   // If user callback returns NULL, then mongoose proceeds
   // with handshake, otherwise it closes the connection.
@@ -117,6 +102,36 @@ enum mg_event {
   // Callback's return value is ignored.
   // ev_data contains NULL.
   MG_WEBSOCKET_CLOSE,
+
+  // Mongoose tries to open file.
+  // If callback returns non-NULL, Mongoose will not try to open it, but
+  // will use the returned value as a pointer to the file data. This allows
+  // for example to serve files from memory.
+  // ev_data contains file path, including document root path.
+  // Upon return, ev_data should return file size,  which should be a long int.
+  //
+  //   const char *file_name = request_info->ev_data;
+  //   if (strcmp(file_name, "foo.txt") == 0) {
+  //     request_info->ev_data = (void *) (long) 4;
+  //     return "data";
+  //   }
+  //   return NULL;
+  //
+  // Note that this even is sent multiple times during one request. Each
+  // time mongoose tries to open or stat the file, this event is sent, e.g.
+  // for opening .htpasswd file, stat-ting requested file, opening requested
+  // file, etc.
+  MG_OPEN_FILE,
+
+  // Mongoose initializes Lua server page. Sent only if Lua support is enabled.
+  // Callback's return value is ignored.
+  // ev_data contains lua_State pointer.
+  MG_INIT_LUA,
+
+  // Mongoose has uploaded file to a temporary directory.
+  // Callback's return value is ignored.
+  // ev_data contains NUL-terminated file name.
+  MG_UPLOAD,
 };
 
 
@@ -324,6 +339,12 @@ void mg_close_connection(struct mg_connection *conn);
 //   to fclose() the opened file stream.
 FILE *mg_fetch(struct mg_context *ctx, const char *url, const char *path,
                char *buf, size_t buf_len, struct mg_request_info *request_info);
+
+
+// File upload functionality. Each uploaded file gets saved into a temporary
+// file and MG_UPLOAD event is sent.
+// Return number of uploaded files.
+int mg_upload(struct mg_connection *conn, const char *destination_dir);
 
 
 // Convenience function -- create detached thread.

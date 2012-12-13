@@ -29,8 +29,15 @@
 #define __STDC_LIMIT_MACROS   // C++ wants that for INT64_MAX
 #endif
 
+#if defined (_MSC_VER)
+#pragma warning (disable : 4127)    // conditional expression is constant: introduced by FD_SET(..)
+#pragma warning (disable : 4204)    // non-constant aggregate initializer: issued due to missing C99 support
+#endif
+
+// Disable WIN32_LEAN_AND_MEAN.
+// This makes windows.h always include winsock2.h
 #ifdef WIN32_LEAN_AND_MEAN
-#undef WIN32_LEAN_AND_MEAN    // Disable WIN32_LEAN_AND_MEAN, if necessary
+#undef WIN32_LEAN_AND_MEAN
 #endif
 
 #if defined(__SYMBIAN32__)
@@ -60,8 +67,6 @@
 #if defined(_WIN32) && !defined(__SYMBIAN32__) // Windows specific
 #define _WIN32_WINNT 0x0400 // To make it link in VS2005
 #include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
@@ -146,6 +151,8 @@ static int pthread_mutex_lock(pthread_mutex_t *);
 static int pthread_mutex_unlock(pthread_mutex_t *);
 
 static void to_unicode(const char *path, wchar_t *wbuf, size_t wbuf_len);
+
+struct file;
 static char *mg_fgets(char *buf, size_t size, struct file *filep, char **p);
 
 #if defined(HAVE_STDINT)
@@ -518,6 +525,9 @@ const char **mg_get_valid_option_names(void) {
 }
 
 static void *call_user(struct mg_connection *conn, enum mg_event event) {
+  if (conn != NULL && conn->ctx != NULL) {
+    conn->request_info.user_data = conn->ctx->user_data;
+  }
   return conn == NULL || conn->ctx == NULL || conn->ctx->user_callback == NULL ?
     NULL : conn->ctx->user_callback(event, conn);
 }
@@ -744,7 +754,7 @@ static int mg_snprintf(struct mg_connection *conn, char *buf, size_t buflen,
 }
 
 // Skip the characters until one of the delimiters characters found.
-// 0-terminate resulting word. Skip the delimiter and following whitespaces if any.
+// 0-terminate resulting word. Skip the delimiter and following whitespaces.
 // Advance pointer to buffer to the next word. Return found 0-terminated word.
 // Delimiters can be quoted with quotechar.
 static char *skip_quoted(char **buf, const char *delimiters,
@@ -1240,6 +1250,13 @@ static int kill(pid_t pid, int sig_num) {
   return 0;
 }
 
+static void trim_trailing_whitespaces(char *s) {
+  char *e = s + strlen(s) - 1;
+  while (e > s && isspace(* (unsigned char *) e)) {
+    *e-- = '\0';
+  }
+}
+
 static pid_t spawn_process(struct mg_connection *conn, const char *prog,
                            char *envblk, char *envp[], int fd_stdin,
                            int fd_stdout, const char *dir) {
@@ -1276,10 +1293,7 @@ static pid_t spawn_process(struct mg_connection *conn, const char *prog,
     }
 
     if (buf[0] == '#' && buf[1] == '!') {
-      // Trim whitespace in interpreter name
-      for (p = buf + 2; *p != '\0' && isspace(* (unsigned char *) p); )
-        p++;
-      *p = '\0';
+      trim_trailing_whitespaces(buf + 2);
     } else {
       buf[2] = '\0';
     }
@@ -1328,6 +1342,8 @@ static int mg_stat(struct mg_connection *conn, const char *path,
     filep->size = st.st_size;
     filep->modification_time = st.st_mtime;
     filep->is_directory = S_ISDIR(st.st_mode);
+  } else {
+    filep->modification_time = (time_t) 0;
   }
 
   return filep->membuf != NULL || filep->modification_time != (time_t) 0;
@@ -1469,7 +1485,7 @@ static int pull(FILE *fp, struct mg_connection *conn, char *buf, int len) {
     // pipe, fread() may block until IO buffer is filled up. We cannot afford
     // to block and must pass all read bytes immediately to the client.
     nread = read(fileno(fp), buf, (size_t) len);
-  } else if (!wait_until_socket_is_readable(conn)) {
+  } else if (!conn->must_close && !wait_until_socket_is_readable(conn)) {
     nread = -1;
   } else if (conn->ssl != NULL) {
     nread = SSL_read(conn->ssl, buf, len);
@@ -1605,10 +1621,9 @@ int mg_printf(struct mg_connection *conn, const char *fmt, ...) {
 // form-url-encoded data differs from URI encoding in a way that it
 // uses '+' as character for space, see RFC 1866 section 8.2.1
 // http://ftp.ics.uci.edu/pub/ietf/html/rfc1866.txt
-static size_t url_decode(const char *src, size_t src_len, char *dst,
-                         size_t dst_len, int is_form_url_encoded) {
-  size_t i, j;
-  int a, b;
+static int url_decode(const char *src, int src_len, char *dst,
+                      int dst_len, int is_form_url_encoded) {
+  int i, j, a, b;
 #define HEXTOI(x) (isdigit(x) ? x - '0' : x - 'W')
 
   for (i = j = 0; i < src_len && j < dst_len - 1; i++, j++) {
@@ -1628,7 +1643,7 @@ static size_t url_decode(const char *src, size_t src_len, char *dst,
 
   dst[j] = '\0'; // Null-terminate the destination
 
-  return j;
+  return i >= src_len ? j : -1;
 }
 
 // Scan given buffer and fetch the value of the given variable.
@@ -1670,9 +1685,7 @@ int mg_get_var(const char *buf, size_t buf_len, const char *name,
         assert(s >= p);
 
         // Decode variable into destination buffer
-        if ((size_t) (s - p) < dst_len) {
-          len = (int) url_decode(p, (size_t)(s - p), dst, dst_len, 1);
-        }
+        len = url_decode(p, (size_t)(s - p), dst, dst_len, 1);
         break;
       }
     }
@@ -1884,6 +1897,7 @@ static const struct {
   {".xml", 4, "text/xml"},
   {".json",  5, "text/json"},
   {".xslt", 5, "application/xml"},
+  {".xsl", 4, "application/xml"},
   {".ra",  3, "audio/x-pn-realaudio"},
   {".doc", 4, "application/msword"},
   {".exe", 4, "application/octet-stream"},
@@ -3188,18 +3202,21 @@ static void handle_cgi_request(struct mg_connection *conn, const char *prog) {
     send_http_error(conn, 500, http_500_error,
         "Cannot create CGI pipe: %s", strerror(ERRNO));
     goto done;
-  } else if ((pid = spawn_process(conn, p, blk.buf, blk.vars,
-          fd_stdin[0], fd_stdout[1], dir)) == (pid_t) -1) {
-    send_http_error(conn, 500, http_500_error,
-        "Cannot spawn CGI process [%s]: %s", prog, strerror(ERRNO));
-    goto done;
   }
 
+  pid = spawn_process(conn, p, blk.buf, blk.vars, fd_stdin[0], fd_stdout[1],
+                      dir);
   // spawn_process() must close those!
   // If we don't mark them as closed, close() attempt before
   // return from this function throws an exception on Windows.
   // Windows does not like when closed descriptor is closed again.
   fd_stdin[0] = fd_stdout[1] = -1;
+
+  if (pid == (pid_t) -1) {
+    send_http_error(conn, 500, http_500_error,
+        "Cannot spawn CGI process [%s]: %s", prog, strerror(ERRNO));
+    goto done;
+  }
 
   if ((in = fdopen(fd_stdin[1], "wb")) == NULL ||
       (out = fdopen(fd_stdout[0], "rb")) == NULL) {
@@ -4000,7 +4017,6 @@ static void prepare_lua_environment(struct mg_connection *conn, lua_State *L) {
 static void handle_lsp_request(struct mg_connection *conn, const char *path,
                                struct file *filep) {
   void *p = NULL;
-  FILE *fp = NULL;
   lua_State *L = NULL;
 
   if (!mg_fopen(conn, path, "r", filep)) {
@@ -4015,15 +4031,123 @@ static void handle_lsp_request(struct mg_connection *conn, const char *path,
     mg_printf(conn, "%s", "HTTP/1.1 200 OK\r\n"
               "Content-Type: text/html\r\nConnection: close\r\n\r\n");
     prepare_lua_environment(conn, L);
+    conn->request_info.ev_data = L;
+    call_user(conn, MG_INIT_LUA);
     lsp(conn, filep->membuf == NULL ? p : filep->membuf, filep->size, L);
   }
 
   if (L) lua_close(L);
-  if (p) munmap(p, st->size);
-  if (fp) fclose(fp);
-
+  if (p) munmap(p, filep->size);
+  mg_fclose(filep);
 }
 #endif // USE_LUA
+
+int mg_upload(struct mg_connection *conn, const char *destination_dir) {
+  const char *content_type_header, *boundary_start;
+  char buf[8192], path[PATH_MAX], fname[1024], boundary[100], *s;
+  FILE *fp;
+  int bl, n, i, j, headers_len, boundary_len, len = 0, num_uploaded_files = 0;
+
+  // Request looks like this:
+  //
+  // POST /upload HTTP/1.1
+  // Host: 127.0.0.1:8080
+  // Content-Length: 244894
+  // Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryRVr
+  //
+  // ------WebKitFormBoundaryRVr
+  // Content-Disposition: form-data; name="file"; filename="accum.png"
+  // Content-Type: image/png
+  //
+  //  <89>PNG
+  //  <PNG DATA>
+  // ------WebKitFormBoundaryRVr
+
+  // Extract boundary string from the Content-Type header
+  if ((content_type_header = mg_get_header(conn, "Content-Type")) == NULL ||
+      (boundary_start = strstr(content_type_header, "boundary=")) == NULL ||
+      (sscanf(boundary_start, "boundary=\"%99[^\"]\"", boundary) == 0 &&
+       sscanf(boundary_start, "boundary=%99s", boundary) == 0) ||
+      boundary[0] == '\0') {
+    return num_uploaded_files;
+  }
+
+  boundary_len = strlen(boundary);
+  bl = boundary_len + 4;  // \r\n--<boundary>
+  for (;;) {
+    // Pull in headers
+    assert(len >= 0 && len <= (int) sizeof(buf));
+    while ((n = mg_read(conn, buf + len, sizeof(buf) - len)) > 0) {
+      len += n;
+    }
+    if ((headers_len = get_request_len(buf, len)) <= 0) {
+      break;
+    }
+
+    // Fetch file name.
+    fname[0] = '\0';
+    for (i = j = 0; i < headers_len; i++) {
+      if (buf[i] == '\r' && buf[i + 1] == '\n') {
+        buf[i] = buf[i + 1] = '\0';
+        // TODO(lsm): don't expect filename to be the 3rd field,
+        // parse the header properly instead.
+        sscanf(&buf[j], "Content-Disposition: %*s %*s filename=\"%1023[^\"]",
+               fname);
+        j = i + 2;
+      }
+    }
+
+    // Give up if the headers are not what we expect
+    if (fname[0] == '\0') {
+      break;
+    }
+
+    // Move data to the beginning of the buffer
+    assert(len >= headers_len);
+    memmove(buf, &buf[headers_len], len - headers_len);
+    len -= headers_len;
+
+    // We open the file with exclusive lock held. This guarantee us
+    // there is no other thread can save into the same file simultaneously.
+    fp = NULL;
+    // Construct destination file name. Do not allow paths to have slashes.
+    if ((s = strrchr(fname, '/')) == NULL) {
+      s = fname;
+    }
+    // Open file in binary mode with exclusive lock set
+    snprintf(path, sizeof(path), "%s/%s", destination_dir, s);
+    if ((fp = fopen(path, "wbx")) == NULL) {
+      break;
+    }
+
+    // Read POST data, write into file until boundary is found.
+    n = 0;
+    do {
+      len += n;
+      for (i = 0; i < len - bl; i++) {
+        if (!memcmp(&buf[i], "\r\n--", 4) &&
+            !memcmp(&buf[i + 4], boundary, boundary_len)) {
+          // Found boundary, that's the end of file data.
+          (void) fwrite(buf, 1, i, fp);
+          num_uploaded_files++;
+          conn->request_info.ev_data = (void *) path;
+          call_user(conn, MG_UPLOAD);
+          memmove(buf, &buf[i + bl], len - (i + bl));
+          len -= i + bl;
+          break;
+        }
+      }
+      if (len > bl) {
+        fwrite(buf, 1, len - bl, fp);
+        memmove(buf, &buf[len - bl], len - bl);
+        len = bl;
+      }
+    } while ((n = mg_read(conn, buf + len, sizeof(buf) - len)) > 0);
+    fclose(fp);
+  }
+
+  return num_uploaded_files;
+}
 
 // This is the heart of the Mongoose's logic.
 // This function is called when the request is read, parsed and validated,
@@ -4039,8 +4163,7 @@ static void handle_request(struct mg_connection *conn) {
     * ((char *) conn->request_info.query_string++) = '\0';
   }
   uri_len = (int) strlen(ri->uri);
-  url_decode(ri->uri, (size_t)uri_len, (char *) ri->uri,
-             (size_t) (uri_len + 1), 0);
+  url_decode(ri->uri, uri_len, (char *) ri->uri, uri_len + 1, 0);
   remove_double_dots_and_double_slashes((char *) ri->uri);
   convert_uri_to_file_name(conn, path, sizeof(path), &file);
   conn->throttle = set_throttle(conn->ctx->config[THROTTLE],
@@ -4090,7 +4213,7 @@ static void handle_request(struct mg_connection *conn) {
           "Directory listing denied");
     }
 #ifdef USE_LUA
-  } else if (match_prefix("**.lsp$", 7, path) > 0) {
+  } else if (match_prefix("**.lp$", 6, path) > 0) {
     handle_lsp_request(conn, path, &file);
 #endif
 #if !defined(NO_CGI)
@@ -4458,7 +4581,11 @@ static void uninitialize_ssl(struct mg_context *ctx) {
 static int set_gpass_option(struct mg_context *ctx) {
   struct file file;
   const char *path = ctx->config[GLOBAL_PASSWORDS_FILE];
-  return path == NULL || !mg_stat(fc(ctx), path, &file);
+  if (path != NULL && !mg_stat(fc(ctx), path, &file)) {
+    cry(fc(ctx), "Cannot open %s: %s", path, strerror(ERRNO));
+    return 0;
+  }
+  return 1;
 }
 
 static int set_acl_option(struct mg_context *ctx) {
@@ -4501,6 +4628,8 @@ static void close_socket_gracefully(struct mg_connection *conn) {
 }
 
 static void close_connection(struct mg_connection *conn) {
+  conn->must_close = 1;
+
   if (conn->ssl) {
     SSL_free(conn->ssl);
     conn->ssl = NULL;
@@ -4622,6 +4751,9 @@ static void process_new_connection(struct mg_connection *conn) {
 
   keep_alive_enabled = !strcmp(conn->ctx->config[ENABLE_KEEP_ALIVE], "yes");
 
+  // Important: on new connection, reset the receiving buffer. Credit goes
+  // to crule42.
+  conn->data_len = 0;
   do {
     reset_per_request_attributes(conn);
     conn->request_len = read_request(NULL, conn, conn->buf, conn->buf_size,
@@ -4950,6 +5082,7 @@ struct mg_context *mg_start(mg_callback_t user_callback, void *user_data,
     }
     if (ctx->config[i] != NULL) {
       cry(fc(ctx), "warning: %s: duplicate option", name);
+      free(ctx->config[i]);
     }
     ctx->config[i] = mg_strdup(value);
     DEBUG_TRACE(("[%s] -> [%s]", name, value));
