@@ -1,0 +1,10 @@
+CMakeCache.txt 
+CMakeFiles 
+cmake_install.cmake 
+CPackConfig.cmake 
+CPackSourceConfig.cmake 
+lib*.so 
+Makefile 
+tiny
+POTFILES
+LINGUAS
