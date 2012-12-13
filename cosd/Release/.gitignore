@@ -5,6 +5,6 @@ CPackConfig.cmake
 CPackSourceConfig.cmake 
 lib*.so 
 Makefile 
-tiny
+cosd
 POTFILES
 LINGUAS
