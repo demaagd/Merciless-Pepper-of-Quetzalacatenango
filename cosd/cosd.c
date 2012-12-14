@@ -51,11 +51,10 @@ char *errptr;
 
 void usage(char *err, int ec) {
   if(err!=NULL) {
-    fprintf(stderr,_("Error: %s\n"),err);
-    fprintf(stderr,"\n");
+    fprintf(stderr,_("Error: %s\n\n"),err);
   }
   
-  fprintf(stderr,_("Usage (v%i.%i.%i):\n"),cosd_VERSION_MAJOR,cosd_VERSION_MINOR,cosd_VERSION_REV);
+  fprintf(stderr,_("Usage (cosd v%i.%i.%i):\n"),cosd_VERSION_MAJOR,cosd_VERSION_MINOR,cosd_VERSION_REV);
   fprintf(stderr,_(" -d database dir        -- Specifies database connection to use, module:/path/to/file\n"));
   fprintf(stderr,_(" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"));
   fprintf(stderr,_(" -n N                   -- Number of HTTP serving threads (default: 10)\n"));
@@ -87,7 +86,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
     saddr.s_addr = ntohl(request_info->remote_ip);
     
     LOG_DEBUG(vlevel, _("Connection from: %s, request: %s\n"), inet_ntoa(saddr), req);
-    if(strncmp(req, "/status\0", 8) == 0) { // status
+    if(strncmp(req, "/status\0", 8) == 0) { 
       // XXX how to get more status 
       mg_printf(conn,
 		"HTTP/1.1 200 OK\r\n"
@@ -160,9 +159,10 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       } 
       free(tmp);
     } else if(strncmp(req, "/pset/", 6) == 0) { 
+      // XXX
     } else if(strncmp(req, "/pget/", 6) == 0) { 
       // XXX
-    } else { // other
+    } else { 
       // XXX
       LOG_ERROR(vlevel,_("Unknown/unhandled request\n"));
     }
@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
     }
   }
   
-  // validation
+  LOG_TRACE(vlevel, _("Validation\n"),dbd);
   if(dbd==NULL) {
     usage("Must give a database dir\n",EXIT_FAILURE);
   } else {
@@ -249,7 +249,6 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  // XXX - set up leveldb handle
   LOG_TRACE(vlevel, _("Setting up leveldb store in %s\n"),dbd);
   dbopt=leveldb_options_create();
   leveldb_options_set_create_if_missing(dbopt, 1);
