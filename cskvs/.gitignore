@@ -1,0 +1,16 @@
+CMakeCache.txt
+CMakeFiles
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+cmake_install.cmake
+urlshortd
+lib*.so
+*rpm
+*deb
+_CPack_Packages
+install_manifest.txt
+*gmo
+*po
+*pot
+*~
