@@ -191,15 +191,11 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						t=(char*)json_object_to_json_string(tj);
 						key=calloc(strlen(t),sizeof(char));
 						snprintf(key,strlen(t)-1,"%s",t+1);
-						json_object_put(tj);
 						
 						tj=json_object_object_get(av, "value");
 						t=(char*)json_object_to_json_string(tj);
 						val=calloc(strlen(t),sizeof(char));
 						snprintf(val,strlen(t)-1,"%s",t+1);
-						json_object_put(tj);
-						
-						json_object_put(av);
 						
 						LOG_TRACE(vlevel,_("Have element: %i: key %s value %s\n"),n, key, val);
 						
@@ -267,7 +263,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						
 						t=leveldb_get(dbh, ropt, key, strlen(key), &rlen, &errptr);					
 						
-						if(rlen) {
+						if(rlen && t) {
 							struct json_object *tjkv;
 							struct json_object *tjk;
 							struct json_object *tjv;
@@ -288,8 +284,8 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 							free(t);
 						}
 						
-						json_object_put(tj);
-						json_object_put(av);
+						//json_object_put(tj);
+						//json_object_put(av);
 						
 						free(key);
 						n++;
