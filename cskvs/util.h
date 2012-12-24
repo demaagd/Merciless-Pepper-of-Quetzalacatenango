@@ -38,6 +38,7 @@ void jsondequote(char **jstr);
 
 #define SHORT_STRING_MAX 512 
 #define URL_STRING_MAX 8192
+#define POST_DATA_STRING_MAX 16384
 
 #define LOG_LVL_TRACE 4
 #define LOG_LVL_DEBUG 3
