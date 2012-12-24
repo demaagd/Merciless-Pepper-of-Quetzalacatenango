@@ -219,11 +219,13 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 								4);
 			free(pd);
     } else if(strncmp(req, "/mget/\0", 7) == 0) {
-			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));			
+			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));
+			char *retstr;
       int pdlen = mg_read(conn, pd, POST_DATA_STRING_MAX);
+			int mgal=-1, n;
 			struct json_object  *ret=json_object_new_array();
 			struct json_object *mgjo=json_tokener_parse(pd);
-			int mgal=-1, n;
+
 
 			LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
 
@@ -247,8 +249,6 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 					key=calloc(strlen(t),sizeof(char));
 					snprintf(key,strlen(t)-1,"%s",t+1);
 					
-					LOG_TRACE(vlevel,_("Have element: %i: key %s\n"),n, key);
-
 					t=leveldb_get(dbh, ropt, key, strlen(key), &rlen, &errptr);					
 
 					if(rlen) {
@@ -258,7 +258,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						char *val=calloc(rlen+2,sizeof(char));
 
 						snprintf(val,rlen+1,"%s",t);
-						LOG_DEBUG(vlevel, _("Found: %s for %s\n"),val,key);
+						LOG_TRACE(vlevel, _("Found: %s for %s at %i\n"),val,key,n);
 						tjk=json_object_new_string(key);
 						tjv=json_object_new_string((const char*)val);
 						
@@ -278,8 +278,14 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 					free(key);
 					n++;
 				}
-				printf("Foo: %s\n", json_object_to_json_string(ret));
-
+				retstr=(char*)json_object_to_json_string(ret);
+				mg_printf(conn,
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: application/json\r\n"
+									"Content-Length: %d\r\n"
+									"\r\n"
+									"%s\r\n",
+									strlen(retstr)+2, retstr);
 
 				json_object_put(ret);
 				json_object_put(mgjo);
