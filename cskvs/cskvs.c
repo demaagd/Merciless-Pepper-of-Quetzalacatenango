@@ -162,56 +162,72 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			int msal=-1, n;
 			struct json_object *msjo=json_tokener_parse(pd);
 
-			if(msjo == NULL) {
+			if(msjo == NULL || pdlen < 2) {
 				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
-			}
-			msal=json_object_array_length(msjo);
-			if(msal > 0) {
-				leveldb_writebatch_t *wb = leveldb_writebatch_create();
+				mg_printf(conn,
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: 12\r\n"
+									"\r\n"
+									"PARSEERROR\r\n");
+			} else {
+				LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
 
-				n=0;
-				while(n<msal) {
-					struct json_object *tj;
-					struct json_object *av;
-					char *key=NULL;
-					char *val=NULL;	
-					char *t;
+				msal=json_object_array_length(msjo);
+				if(msal > 0) {
+					leveldb_writebatch_t *wb = leveldb_writebatch_create();
 					
-					av=json_object_array_get_idx(msjo, n);
-					
-					tj=json_object_object_get(av, "key");
-					t=(char*)json_object_to_json_string(tj);
-					key=calloc(strlen(t),sizeof(char));
-					snprintf(key,strlen(t)-1,"%s",t+1);
-					json_object_put(tj);
-					
-					tj=json_object_object_get(av, "value");
-					t=(char*)json_object_to_json_string(tj);
-					val=calloc(strlen(t),sizeof(char));
-					snprintf(val,strlen(t)-1,"%s",t+1);
-					json_object_put(tj);
-					
-					json_object_put(av);
-					
-					LOG_TRACE(vlevel,_("Have element: %i: key %s value %s\n"),n, key, val);
+					n=0;
+					while(n<msal) {
+						struct json_object *tj;
+						struct json_object *av;
+						char *key=NULL;
+						char *val=NULL;	
+						char *t;
+						
+						av=json_object_array_get_idx(msjo, n);
+						
+						tj=json_object_object_get(av, "key");
+						t=(char*)json_object_to_json_string(tj);
+						key=calloc(strlen(t),sizeof(char));
+						snprintf(key,strlen(t)-1,"%s",t+1);
+						json_object_put(tj);
+						
+						tj=json_object_object_get(av, "value");
+						t=(char*)json_object_to_json_string(tj);
+						val=calloc(strlen(t),sizeof(char));
+						snprintf(val,strlen(t)-1,"%s",t+1);
+						json_object_put(tj);
+						
+						json_object_put(av);
+						
+						LOG_TRACE(vlevel,_("Have element: %i: key %s value %s\n"),n, key, val);
+						
+						leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
+						free(key);
+						free(val);
+						n++;
+					}
+					leveldb_write(dbh, wopt, wb, &errptr);
+					leveldb_writebatch_destroy(wb);
 
-					leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
-					free(key);
-					free(val);
-					n++;
+					json_object_put(msjo);
+					
+					mg_printf(conn,
+										"HTTP/1.1 200 OK\r\n"
+										"Content-Type: text/plain\r\n"
+										"Content-Length: 4\r\n"
+										"\r\n"
+										"OK\r\n");
+				} else {
+					mg_printf(conn,
+										"HTTP/1.1 200 OK\r\n"
+										"Content-Type: text/plain\r\n"
+										"Content-Length: 7\r\n"
+										"\r\n"
+										"EMPTY\r\n");
 				}
-				leveldb_write(dbh, wopt, wb, &errptr);
-				leveldb_writebatch_destroy(wb);
 			}
-			json_object_put(msjo);
-			
-			LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
-      mg_printf(conn,
-								"HTTP/1.1 200 OK\r\n"
-								"Content-Type: text/plain\r\n"
-								"Content-Length: 4\r\n"
-								"\r\n"
-								"OK\r\n");
 			free(pd);
     } else if(strncmp(req, "/mget/\0", 7) == 0) {
 			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));
@@ -221,10 +237,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			struct json_object  *ret=json_object_new_array();
 			struct json_object *mgjo=json_tokener_parse(pd);
 
-
-			LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
-
-			if(mgjo == NULL) {
+			if(mgjo == NULL || pdlen < 2) {
 				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
 				mg_printf(conn,
 									"HTTP/1.1 200 OK\r\n"
@@ -233,6 +246,8 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									"\r\n"
 									"PARSEERROR\r\n");
 			} else {
+				LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
+
 				mgal=json_object_array_length(mgjo);
 				if(mgal > 0) {
 					n=0;
@@ -300,14 +315,16 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 				}
 			}
 			free(pd);
-
-      // XXX
     } else { // other
-      // XXX
       LOG_ERROR(vlevel,_("Unknown/unhandled request\n"));
+			mg_printf(conn,
+								"HTTP/1.1 500 OK\r\n"
+								"Content-Type: text/plain\r\n"
+								"Content-Length: 11\r\n"
+								"\r\n"
+								"MALFORMED\r\n");
     }
     free(req);
-    return "";
   } else {
     return NULL;
   }
