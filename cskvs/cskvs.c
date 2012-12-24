@@ -93,10 +93,9 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       mg_printf(conn,
 								"HTTP/1.1 200 OK\r\n"
 								"Content-Type: text/plain\r\n"
-								"Content-Length: %d\r\n"
+								"Content-Length: 4\r\n"
 								"\r\n"
-								"OK\r\n",
-								4);
+								"OK\r\n");
     } else if(strncmp(req, "/set/", 5) == 0) { 
       int n=strlen(req);
       while(n) {
@@ -115,10 +114,9 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						mg_printf(conn,
 											"HTTP/1.1 200 OK\r\n"
 											"Content-Type: text/plain\r\n"
-											"Content-Length: %d\r\n"
+											"Content-Length: 4\r\n"
 											"\r\n"
-											"OK\r\n",
-											4);
+											"OK\r\n");
 					}
 					break;
 				}
@@ -129,10 +127,9 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 				mg_printf(conn,
 									"HTTP/1.1 500 OK\r\n"
 									"Content-Type: text/plain\r\n"
-									"Content-Length: %d\r\n"
+									"Content-Length: 11\r\n"
 									"\r\n"
-									"MALFORMED\r\n",
-									11);
+									"MALFORMED\r\n");
       }
     } else if(strncmp(req, "/get/", 5) == 0) {
       size_t rlen=-1;
@@ -154,10 +151,9 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 				mg_printf(conn,
 									"HTTP/1.1 500 OK\r\n"
 									"Content-Type: text/plain\r\n"
-									"Content-Length: %d\r\n"
+									"Content-Length: 10\r\n"
 									"\r\n"
-									"NOTFOUND\r\n",
-									10);
+									"NOTFOUND\r\n");
       } 
       free(tmp);
     } else if(strncmp(req, "/mset/\0", 7) == 0) {
@@ -213,10 +209,9 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       mg_printf(conn,
 								"HTTP/1.1 200 OK\r\n"
 								"Content-Type: text/plain\r\n"
-								"Content-Length: %d\r\n"
+								"Content-Length: 4\r\n"
 								"\r\n"
-								"OK\r\n",
-								4);
+								"OK\r\n");
 			free(pd);
     } else if(strncmp(req, "/mget/\0", 7) == 0) {
 			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));
@@ -231,64 +226,78 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 
 			if(mgjo == NULL) {
 				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
-			}
-			mgal=json_object_array_length(mgjo);
-			if(mgal > 0) {
-				n=0;
-				while(n<mgal) {
-					struct json_object *tj;
-					struct json_object *av;
-					char *key=NULL;
-					char *t;
-					size_t rlen=0;
-
-					av=json_object_array_get_idx(mgjo, n);
-					
-					tj=json_object_object_get(av, "key");
-					t=(char*)json_object_to_json_string(tj);
-					key=calloc(strlen(t),sizeof(char));
-					snprintf(key,strlen(t)-1,"%s",t+1);
-					
-					t=leveldb_get(dbh, ropt, key, strlen(key), &rlen, &errptr);					
-
-					if(rlen) {
-						struct json_object *tjkv;
-						struct json_object *tjk;
-						struct json_object *tjv;
-						char *val=calloc(rlen+2,sizeof(char));
-
-						snprintf(val,rlen+1,"%s",t);
-						LOG_TRACE(vlevel, _("Found: %s for %s at %i\n"),val,key,n);
-						tjk=json_object_new_string(key);
-						tjv=json_object_new_string((const char*)val);
-						
-						tjkv=json_object_new_object();
-						json_object_object_add(tjkv, "key", tjk);
-						json_object_object_add(tjkv, "value", tjv);
-					
-						json_object_array_add(ret,tjkv);
-						
-						free(val);
-						free(t);
-					}
-
-					json_object_put(tj);
-					json_object_put(av);
-
-					free(key);
-					n++;
-				}
-				retstr=(char*)json_object_to_json_string(ret);
 				mg_printf(conn,
 									"HTTP/1.1 200 OK\r\n"
-									"Content-Type: application/json\r\n"
-									"Content-Length: %d\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: 12\r\n"
 									"\r\n"
-									"%s\r\n",
-									strlen(retstr)+2, retstr);
-
-				json_object_put(ret);
-				json_object_put(mgjo);
+									"PARSEERROR\r\n");
+			} else {
+				mgal=json_object_array_length(mgjo);
+				if(mgal > 0) {
+					n=0;
+					while(n<mgal) {
+						struct json_object *tj;
+						struct json_object *av;
+						char *key=NULL;
+						char *t;
+						size_t rlen=0;
+						
+						av=json_object_array_get_idx(mgjo, n);
+						
+						tj=json_object_object_get(av, "key");
+						t=(char*)json_object_to_json_string(tj);
+						key=calloc(strlen(t),sizeof(char));
+						snprintf(key,strlen(t)-1,"%s",t+1);
+						
+						t=leveldb_get(dbh, ropt, key, strlen(key), &rlen, &errptr);					
+						
+						if(rlen) {
+							struct json_object *tjkv;
+							struct json_object *tjk;
+							struct json_object *tjv;
+							char *val=calloc(rlen+2,sizeof(char));
+							
+							snprintf(val,rlen+1,"%s",t);
+							LOG_TRACE(vlevel, _("Found: %s for %s at %i\n"),val,key,n);
+							tjk=json_object_new_string(key);
+							tjv=json_object_new_string((const char*)val);
+							
+							tjkv=json_object_new_object();
+							json_object_object_add(tjkv, "key", tjk);
+							json_object_object_add(tjkv, "value", tjv);
+							
+							json_object_array_add(ret,tjkv);
+							
+							free(val);
+							free(t);
+						}
+						
+						json_object_put(tj);
+						json_object_put(av);
+						
+						free(key);
+						n++;
+					}
+					retstr=(char*)json_object_to_json_string(ret);
+					mg_printf(conn,
+										"HTTP/1.1 200 OK\r\n"
+										"Content-Type: application/json\r\n"
+										"Content-Length: %d\r\n"
+										"\r\n"
+										"%s\r\n",
+										strlen(retstr)+2, retstr);
+					
+					json_object_put(ret);
+					json_object_put(mgjo);
+				} else {
+					mg_printf(conn,
+										"HTTP/1.1 200 OK\r\n"
+										"Content-Type: text/plain\r\n"
+										"Content-Length: 7\r\n"
+										"\r\n"
+										"EMPTY\r\n");
+				}
 			}
 			free(pd);
 
