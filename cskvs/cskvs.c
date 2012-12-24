@@ -222,38 +222,37 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));			
       int pdlen = mg_read(conn, pd, POST_DATA_STRING_MAX);
 			struct json_object  *ret=json_object_new_array();
-			struct json_object *msjo=json_tokener_parse(pd);
-			int msal=-1, n;
+			struct json_object *mgjo=json_tokener_parse(pd);
+			int mgal=-1, n;
 
 			LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
 
-			if(msjo == NULL) {
+			if(mgjo == NULL) {
 				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
 			}
-			msal=json_object_array_length(msjo);
-			if(msal > 0) {
+			mgal=json_object_array_length(mgjo);
+			if(mgal > 0) {
 				n=0;
-				while(n<msal) {
+				while(n<mgal) {
 					struct json_object *tj;
 					struct json_object *av;
 					char *key=NULL;
 					char *t;
 					size_t rlen=0;
 
-					av=json_object_array_get_idx(msjo, n);
+					av=json_object_array_get_idx(mgjo, n);
 					
 					tj=json_object_object_get(av, "key");
 					t=(char*)json_object_to_json_string(tj);
 					key=calloc(strlen(t),sizeof(char));
 					snprintf(key,strlen(t)-1,"%s",t+1);
-					json_object_put(tj);
-					json_object_put(av);
 					
 					LOG_TRACE(vlevel,_("Have element: %i: key %s\n"),n, key);
 
 					t=leveldb_get(dbh, ropt, key, strlen(key), &rlen, &errptr);					
-					LOG_TRACE(vlevel,_("ldb ret %i bytes\n"),rlen);
+
 					if(rlen) {
+						struct json_object *tjkv;
 						struct json_object *tjk;
 						struct json_object *tjv;
 						char *val=calloc(rlen+2,sizeof(char));
@@ -263,24 +262,27 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						tjk=json_object_new_string(key);
 						tjv=json_object_new_string((const char*)val);
 						
-						tj=json_object_new_object();
-						json_object_object_add(tj, "key", tjk);
-						json_object_object_add(tj, "value", tjv);
+						tjkv=json_object_new_object();
+						json_object_object_add(tjkv, "key", tjk);
+						json_object_object_add(tjkv, "value", tjv);
 					
-						json_object_array_add(ret,tj);
-
-						//json_object_put(tjk);
-						//json_object_put(tjv);
-						//json_object_put(tj);
+						json_object_array_add(ret,tjkv);
+						
 						free(val);
+						free(t);
 					}
+
+					json_object_put(tj);
+					json_object_put(av);
 
 					free(key);
 					n++;
 				}
 				printf("Foo: %s\n", json_object_to_json_string(ret));
 
-				// need to free stuff
+
+				json_object_put(ret);
+				json_object_put(mgjo);
 			}
 			free(pd);
 
