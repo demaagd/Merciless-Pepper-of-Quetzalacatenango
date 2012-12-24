@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <json/json.h> 
 #include <leveldb/c.h>
 #include <netinet/in.h>
 #include <signal.h>
@@ -90,77 +91,134 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
     if(strncmp(req, "/status\0", 8) == 0) { // status
       // XXX how to get more status 
       mg_printf(conn,
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Type: text/plain\r\n"
-		"Content-Length: %d\r\n"        
-		"\r\n"
-		"OK\r\n",
-		4);
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/plain\r\n"
+								"Content-Length: %d\r\n"
+								"\r\n"
+								"OK\r\n",
+								4);
     } else if(strncmp(req, "/set/", 5) == 0) { 
       int n=strlen(req);
       while(n) {
-	if(req[n]==':') {
-	  leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
-	  if(errptr!=NULL) {
-	    LOG_ERROR(vlevel,_("leveldb_put(): %s\n"),errptr);
-	    mg_printf(conn,
-		      "HTTP/1.1 500 OK\r\n"
-		      "Content-Type: text/plain\r\n"
-		      "Content-Length: %d\r\n"        
-		      "\r\n"
-		      "ERROR: %s\r\n",
-		      9+strlen(errptr), errptr);
-	  } else {
-	    mg_printf(conn,
-		      "HTTP/1.1 200 OK\r\n"
-		      "Content-Type: text/plain\r\n"
-		      "Content-Length: %d\r\n"        
-		      "\r\n"
-		      "OK\r\n",
-		      4);
-	  }
-	  break;
-	}
-	n--;
+				if(req[n]==':') {
+					leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
+					if(errptr!=NULL) {
+						LOG_ERROR(vlevel,_("leveldb_put(): %s\n"),errptr);
+						mg_printf(conn,
+											"HTTP/1.1 500 OK\r\n"
+											"Content-Type: text/plain\r\n"
+											"Content-Length: %d\r\n"
+											"\r\n"
+											"ERROR: %s\r\n",
+											9+strlen(errptr), errptr);
+					} else {
+						mg_printf(conn,
+											"HTTP/1.1 200 OK\r\n"
+											"Content-Type: text/plain\r\n"
+											"Content-Length: %d\r\n"
+											"\r\n"
+											"OK\r\n",
+											4);
+					}
+					break;
+				}
+				n--;
       }
       if(n==0) {
-	LOG_ERROR(vlevel,_("Malformed request\n"));
-	mg_printf(conn,
-		  "HTTP/1.1 500 OK\r\n"
-		  "Content-Type: text/plain\r\n"
-		  "Content-Length: %d\r\n"        
-		  "\r\n"
-		  "MALFORMED\r\n",
-		  11);
+				LOG_ERROR(vlevel,_("Malformed request\n"));
+				mg_printf(conn,
+									"HTTP/1.1 500 OK\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: %d\r\n"
+									"\r\n"
+									"MALFORMED\r\n",
+									11);
       }
-    } else if(strncmp(req, "/get/", 5) == 0) { 
+    } else if(strncmp(req, "/get/", 5) == 0) {
       size_t rlen=-1;
       char *tmp=leveldb_get(dbh, ropt, req+5, strlen(req)-5, &rlen, &errptr);
       if(rlen) {
-	char *val=calloc(rlen+2,sizeof(char));
-	snprintf(val,rlen+1,"%s",tmp);
-	LOG_DEBUG(vlevel, _("Found: %s for %s\n"),val,req+5);	      
-	mg_printf(conn,
-		  "HTTP/1.1 200 OK\r\n"
-		  "Content-Type: text/plain\r\n"
-		  "Content-Length: %d\r\n"        
-		  "\r\n"
-		  "%s\r\n",
-		  strlen(val)+2, val);
-	free(val);
+				char *val=calloc(rlen+2,sizeof(char));
+				snprintf(val,rlen+1,"%s",tmp);
+				LOG_DEBUG(vlevel, _("Found: %s for %s\n"),val,req+5);
+				mg_printf(conn,
+									"HTTP/1.1 200 OK\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: %d\r\n"
+									"\r\n"
+									"%s\r\n",
+									strlen(val)+2, val);
+				free(val);
       } else {
-	LOG_DEBUG(vlevel, _("Nothing found for %s\n"),req+5);
-	mg_printf(conn,
-		  "HTTP/1.1 500 OK\r\n"
-		  "Content-Type: text/plain\r\n"
-		  "Content-Length: %d\r\n"        
-		  "\r\n"
-		  "NOTFOUND\r\n",
-		  10);
+				LOG_DEBUG(vlevel, _("Nothing found for %s\n"),req+5);
+				mg_printf(conn,
+									"HTTP/1.1 500 OK\r\n"
+									"Content-Type: text/plain\r\n"
+									"Content-Length: %d\r\n"
+									"\r\n"
+									"NOTFOUND\r\n",
+									10);
       } 
       free(tmp);
-    } else if(strncmp(req, "/pset/", 6) == 0) { 
-    } else if(strncmp(req, "/pget/", 6) == 0) { 
+    } else if(strncmp(req, "/mset/\0", 7) == 0) {
+			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));			
+      int pdlen = mg_read(conn, pd, POST_DATA_STRING_MAX);
+			int msal=-1, n;
+			struct json_object *msjo=json_tokener_parse(pd);
+
+			if(msjo == NULL) {
+				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
+			}
+			msal=json_object_array_length(msjo);
+			if(msal > 0) {
+				leveldb_writebatch_t *wb = leveldb_writebatch_create();
+
+				n=0;
+				while(n<msal) {
+					struct json_object *tj;
+					struct json_object *av;
+					char *key=NULL;
+					char *val=NULL;	
+					char *t;
+					
+					av=json_object_array_get_idx(msjo, n);
+					
+					tj=json_object_object_get(av, "key");
+					t=(char*)json_object_to_json_string(tj);
+					key=calloc(strlen(t),sizeof(char));
+					snprintf(key,strlen(t)-1,"%s",t+1);
+					json_object_put(tj);
+					
+					tj=json_object_object_get(av, "value");
+					t=(char*)json_object_to_json_string(tj);
+					val=calloc(strlen(t),sizeof(char));
+					snprintf(val,strlen(t)-1,"%s",t+1);
+					json_object_put(tj);
+					
+					json_object_put(av);
+					
+					LOG_TRACE(vlevel,_("Have element: %i: key %s value %s\n"),n, key, val);
+
+					leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
+					free(key);
+					free(val);
+					n++;
+				}
+				leveldb_write(dbh, wopt, wb, &errptr);
+				leveldb_writebatch_destroy(wb);
+			}
+			json_object_put(msjo);
+			
+			LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
+      mg_printf(conn,
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: text/plain\r\n"
+								"Content-Length: %d\r\n"
+								"\r\n"
+								"OK\r\n",
+								4);
+			free(pd);
+    } else if(strncmp(req, "/mget/\0", 7) == 0) {
       // XXX
     } else { // other
       // XXX
