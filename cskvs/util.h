@@ -34,7 +34,7 @@ extern int vlevel;
 char *fmmap(char *base, char *file);
 char *strreplace(const char* instr, char *sstr, char *dstr);
 int url_decode(const char *src, size_t src_len, char *dst, size_t dst_len, int is_form_url_encoded);
-void jsondequote(char **jstr);
+void jsondeslash(char **jstr);
 
 #define SHORT_STRING_MAX 512 
 #define URL_STRING_MAX 8192

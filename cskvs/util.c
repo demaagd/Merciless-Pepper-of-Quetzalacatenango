@@ -143,11 +143,16 @@ char *strreplace(const char* instr, char *sstr, char *dstr) {
 	return ret;
 }
 
-void jsondequote(char **jstr) {
-	int n;
+void jsondeslash(char **jstr) {
+	int i=0,j=0;
 	int jl=strlen(*jstr);
-	while(n<jl-1) {
-		*jstr[n]=*jstr[n+1];
-		n++;
+	while(i<=jl) {
+		if((*jstr)[i]=='\\') {
+			i++;	
+		} else {
+			(*jstr)[j]=(*jstr)[i];
+			i++;
+			j++;
+		}
 	}
 }
