@@ -171,7 +171,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									"\r\n"
 									"PARSEERROR\r\n");
 			} else {
-				LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
+				LOG_TRACE(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
 
 				msal=json_object_array_length(msjo);
 				if(msal > 0) {
@@ -210,8 +210,6 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 					leveldb_write(dbh, wopt, wb, &errptr);
 					leveldb_writebatch_destroy(wb);
 
-					json_object_put(msjo);
-					
 					mg_printf(conn,
 										"HTTP/1.1 200 OK\r\n"
 										"Content-Type: text/plain\r\n"
@@ -227,6 +225,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 										"EMPTY\r\n");
 				}
 			}
+			json_object_put(msjo);
 			free(pd);
     } else if(strncmp(req, "/mget/\0", 7) == 0) {
 			char *pd=calloc(POST_DATA_STRING_MAX+1,sizeof(char));
@@ -245,7 +244,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 									"\r\n"
 									"PARSEERROR\r\n");
 			} else {
-				LOG_DEBUG(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
+				LOG_TRACE(vlevel,_("Post data(%i): %s\n"),pdlen,pd);
 
 				mgal=json_object_array_length(mgjo);
 				if(mgal > 0) {
