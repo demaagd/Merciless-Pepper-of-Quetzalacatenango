@@ -89,7 +89,6 @@ int url_decode(const char *src, size_t src_len, char *dst, size_t dst_len, int i
   return (int)j;
 }
 
-
 // replaces all instances of sstr (no {}) with dstr in instr
 char *strreplace(const char* instr, char *sstr, char *dstr) {
 	char *ret=NULL;
@@ -147,7 +146,7 @@ void jsondeslash(char **jstr) {
 	int i=0,j=0;
 	int jl=strlen(*jstr);
 	while(i<=jl) {
-		if((*jstr)[i]=='\\') {
+		if((*jstr)[i]=='\\' && (*jstr)[i+1]=='/') {
 			i++;	
 		} else {
 			(*jstr)[j]=(*jstr)[i];
