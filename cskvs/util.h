@@ -51,7 +51,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                    \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] TRACE ",tstr);                                    \
+      printf("[T:%s][%X] TRACE ",tstr,(long)pthread_self());									\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -60,7 +60,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                    \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] DEBUG ",tstr);                                    \
+      printf("[T:%s][%X] DEBUG ",tstr,(long)pthread_self());						\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -69,7 +69,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                  \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] INFO ",tstr);                                     \
+      printf("[T:%s][%X] INFO ",tstr,(long)pthread_self());						\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -78,7 +78,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                  \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] WARN ",tstr);                                     \
+			printf("[T:%s][%X] WARN ",tstr,(long)pthread_self());									\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -87,7 +87,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                    \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] ERROR ",tstr);                                    \
+      printf("[T:%s][%X] ERROR ",tstr,(long)pthread_self());						\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -96,7 +96,7 @@ void jsondeslash(char **jstr);
       time_t t=time(NULL);                                    \
       char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));                 \
       strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-      printf("[T:%s] FATAL ",tstr);                                    \
+      printf("[T:%s][%X] FATAL ",tstr,(long)pthread_self());									\
       free(tstr);                                                       \
       printf(fmt,##__VA_ARGS__);                                        \
     } } while(0)
@@ -105,7 +105,7 @@ void jsondeslash(char **jstr);
     time_t t=time(NULL);						\
     char *tstr=calloc(SHORT_STRING_MAX,sizeof(char));			\
     strftime(tstr,SHORT_STRING_MAX, "%Y-%m-%d %H:%M:%S", localtime(&t)); \
-    printf("[T:%s] ALWAYS ",tstr);					\
+		printf("[T:%s][%X] ALWAYS ",tstr,(long)pthread_self());	\
     free(tstr);								\
     printf(fmt,##__VA_ARGS__);						\
   } while(0)
