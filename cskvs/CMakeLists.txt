@@ -15,11 +15,12 @@ INCLUDE(FindPkgConfig)
 INCLUDE(leveldb.cmake)
 
 PKG_CHECK_MODULES(JSON json)
+PKG_CHECK_MODULES(ZLIB zlib)
 
 INCLUDE_DIRECTORIES(${LEVELDB_INCLUDE_DIR})
 # INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
 ADD_EXECUTABLE(cskvs cskvs.c util.c util.h mongoose.c mongoose.h)
-TARGET_LINK_LIBRARIES(cskvs pthread dl leveldb json)
+TARGET_LINK_LIBRARIES(cskvs pthread dl leveldb json z)
 
 INSTALL(TARGETS cskvs DESTINATION cskvs)
 

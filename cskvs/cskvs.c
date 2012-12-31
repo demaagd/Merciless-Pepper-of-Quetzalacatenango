@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #include "util.h"
 #include "mongoose.h"
@@ -50,6 +51,10 @@ leveldb_readoptions_t *ropt;
 leveldb_writeoptions_t *wopt;
 char *errptr;	  
 
+unsigned long hmask = 0xFFFFFFFF;
+unsigned long hhval = 0xFFFFFFFF;
+unsigned long lhval = 0x00000000;
+
 void usage(char *err, int ec) {
   if(err!=NULL) {
     fprintf(stderr,_("Error: %s\n"),err);
@@ -61,6 +66,7 @@ void usage(char *err, int ec) {
   fprintf(stderr,_(" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"));
   fprintf(stderr,_(" -n N                   -- Number of HTTP serving threads (default: 10)\n"));
   fprintf(stderr,_(" -a /path/to/accessfile -- Access log file, must be writable (if it exists) or in a writable dir (if it does not exist, it will be created)\n"));
+  fprintf(stderr,_(" -m mapping spec        -- Hash mapping specification\n"));
   fprintf(stderr,_(" -v                     -- Increases verbose level, can be specified multiple times\n"));
   fprintf(stderr,_(" -h                     -- This help listing\n"));
 	
@@ -96,28 +102,66 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 								"Content-Length: 4\r\n"
 								"\r\n"
 								"OK\r\n");
+    } else if(strncmp(req, "/meta/", 6) == 0) { 
+			char *minfo=calloc(SHORT_STRING_MAX, sizeof(char));
+			snprintf(minfo, SHORT_STRING_MAX, "{\"shard\": [{\"mask\": \"0x%08llX\"}, {\"hhval\": \"0x%08llX\"}, {\"lhval\": \"0x%08llX\"}]}", hmask, hhval, lhval);
+			mg_printf(conn,
+								"HTTP/1.1 200 OK\r\n"
+								"Content-Type: application/json\r\n"
+								"Content-Length: %d\r\n"
+								"\r\n"
+								"%s\r\n",
+								strlen(minfo)+2, minfo);
+			free(minfo);
     } else if(strncmp(req, "/set/", 5) == 0) { 
       int n=strlen(req);
       while(n) {
 				if(req[n]==':') {
-					leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
-					if(errptr!=NULL) {
-						LOG_ERROR(vlevel,_("leveldb_put(): %s\n"),errptr);
-						mg_printf(conn,
-											"HTTP/1.1 500 OK\r\n"
-											"Content-Type: text/plain\r\n"
-											"Content-Length: %d\r\n"
-											"\r\n"
-											"ERROR: %s\r\n",
-											9+strlen(errptr), errptr);
+					char *key=NULL;
+					char *val=NULL;	
+					unsigned long kcrc=0;
+
+					key=calloc(n-4,sizeof(char));
+					val=calloc(strlen(req)-n,sizeof(char));
+
+					memcpy(key,req+5,n-5);
+					memcpy(val,req+n+1,strlen(req)-n-1);
+
+					kcrc=crc32(kcrc, key, strlen(key));
+						
+					if((kcrc & hmask) <= hhval && (kcrc & hmask) >= lhval ) {
+						LOG_TRACE(vlevel,_("Allow element: key %s value %s crc %08llX\n"), key, val, kcrc);
+
+						leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
+						if(errptr!=NULL) {
+							LOG_ERROR(vlevel,_("leveldb_put(): %s\n"),errptr);
+							mg_printf(conn,
+												"HTTP/1.1 500 ERROR\r\n"
+												"Content-Type: text/plain\r\n"
+												"Content-Length: %d\r\n"
+												"\r\n"
+												"ERROR: %s\r\n",
+												9+strlen(errptr), errptr);
+						} else {
+							mg_printf(conn,
+												"HTTP/1.1 200 OK\r\n"
+												"Content-Type: text/plain\r\n"
+												"Content-Length: 4\r\n"
+												"\r\n"
+												"OK\r\n");
+						}
 					} else {
+						LOG_TRACE(vlevel,_("Deny element: key %s value %s crc %08llX\n"), key, val, kcrc);
 						mg_printf(conn,
-											"HTTP/1.1 200 OK\r\n"
+											"HTTP/1.1 500 ERROR\r\n"
 											"Content-Type: text/plain\r\n"
-											"Content-Length: 4\r\n"
+											"Content-Length: 12\r\n"
 											"\r\n"
-											"OK\r\n");
+											"OUTOFRANGE\r\n");
 					}
+
+					free(key);
+					free(val);
 					break;
 				}
 				n--;
@@ -125,7 +169,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       if(n==0) {
 				LOG_ERROR(vlevel,_("Malformed request\n"));
 				mg_printf(conn,
-									"HTTP/1.1 500 OK\r\n"
+									"HTTP/1.1 500 ERROR\r\n"
 									"Content-Type: text/plain\r\n"
 									"Content-Length: 11\r\n"
 									"\r\n"
@@ -149,7 +193,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
       } else {
 				LOG_DEBUG(vlevel, _("Nothing found for %s\n"),req+5);
 				mg_printf(conn,
-									"HTTP/1.1 500 OK\r\n"
+									"HTTP/1.1 200 OK\r\n"
 									"Content-Type: text/plain\r\n"
 									"Content-Length: 10\r\n"
 									"\r\n"
@@ -165,7 +209,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 			if(msjo == NULL || pdlen < 2) {
 				LOG_ERROR(vlevel,_("Unable to parse request: %s\n"), pd);
 				mg_printf(conn,
-									"HTTP/1.1 200 OK\r\n"
+									"HTTP/1.1 500 ERROR\r\n"
 									"Content-Type: text/plain\r\n"
 									"Content-Length: 12\r\n"
 									"\r\n"
@@ -184,6 +228,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						char *key=NULL;
 						char *val=NULL;	
 						char *t;
+						unsigned long kcrc=0;
 						
 						av=json_object_array_get_idx(msjo, n);
 						
@@ -199,10 +244,15 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 	
 						jsondeslash(&key);
 						jsondeslash(&val);
-					
-						LOG_TRACE(vlevel,_("Have element: %i: key %s value %s\n"),n, key, val);
+						kcrc=crc32(kcrc, key, strlen(key));
 						
-						leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
+						if((kcrc & hmask) <= hhval && (kcrc & hmask) >= lhval ) {
+							LOG_TRACE(vlevel,_("Allow element: %i: key %s value %s crc %08llX\n"),n, key, val, kcrc);
+							leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
+						} else {
+							LOG_TRACE(vlevel,_("Deny element: %i: key %s value %s crc %08llX\n"),n, key, val, kcrc);
+						}
+
 						free(key);
 						free(val);
 						n++;
@@ -346,7 +396,7 @@ int main(int argc, char **argv) {
   signal(SIGTERM,handlesig);
   
   // command line parsing
-  while ((goopt=getopt (argc, argv, "d:p:n:a:t:vh")) != -1) {
+  while ((goopt=getopt (argc, argv, "d:p:n:a:t:m:M:H:vh")) != -1) {
     switch (goopt) {
     case 'd': // database 
       dbd=calloc(strlen((char*)optarg)+1,sizeof(char));
@@ -361,6 +411,15 @@ int main(int argc, char **argv) {
       break;
     case 'n': // number of threads
       numthreads=atoi(optarg);
+			break;
+    case 'm': // low crc mapping
+			lhval=strtoll((char*)optarg,NULL,16);
+      break;
+    case 'M': // high crc mapping
+			hhval=strtoll((char*)optarg,NULL,16);
+      break;
+    case 'H': // crc mapping mask
+			hmask=strtoll((char*)optarg,NULL,16);
       break;
     case 'v': // verbose
       vlevel++;
