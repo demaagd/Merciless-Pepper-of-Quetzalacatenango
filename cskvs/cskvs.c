@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include <zlib.h>
 
+#include "config.h"
 #include "util.h"
 #include "mongoose.h"
 
@@ -51,9 +52,8 @@ leveldb_readoptions_t *ropt;
 leveldb_writeoptions_t *wopt;
 char *errptr;	  
 
-unsigned long hmask = 0xFFFFFFFF;
-unsigned long hhval = 0xFFFFFFFF;
-unsigned long lhval = 0x00000000;
+int bucketlow=0;
+int buckethigh=255;
 
 void usage(char *err, int ec) {
   if(err!=NULL) {
@@ -104,7 +104,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 								"OK\r\n");
     } else if(strncmp(req, "/meta/", 6) == 0) { 
 			char *minfo=calloc(SHORT_STRING_MAX, sizeof(char));
-			snprintf(minfo, SHORT_STRING_MAX, "{\"shard\": [{\"mask\": \"0x%08llX\"}, {\"hhval\": \"0x%08llX\"}, {\"lhval\": \"0x%08llX\"}]}", hmask, hhval, lhval);
+			snprintf(minfo, SHORT_STRING_MAX, "{\"shard\": [{\"bucketlow\": \"%i\"}, {\"buckethigh\": \"%i\"}, {\"buckets\": \"%i\"}", bucketlow, buckethigh, BUCKETS);
 			mg_printf(conn,
 								"HTTP/1.1 200 OK\r\n"
 								"Content-Type: application/json\r\n"
@@ -120,6 +120,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 					char *key=NULL;
 					char *val=NULL;	
 					unsigned long kcrc=0;
+					int kcrcm=-1;
 
 					key=calloc(n-4,sizeof(char));
 					val=calloc(strlen(req)-n,sizeof(char));
@@ -128,9 +129,10 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 					memcpy(val,req+n+1,strlen(req)-n-1);
 
 					kcrc=crc32(kcrc, key, strlen(key));
-						
-					if((kcrc & hmask) <= hhval && (kcrc & hmask) >= lhval ) {
-						LOG_TRACE(vlevel,_("Allow element: key %s value %s crc %08llX\n"), key, val, kcrc);
+					kcrcm=kcrc % BUCKETS;
+
+					if(kcrcm < buckethigh && kcrcm >= bucketlow) {
+						LOG_TRACE(vlevel,_("Allow element: key %s value %s crc %08llX bucket %i\n"), key, val, kcrc, kcrcm);
 
 						leveldb_put(dbh, wopt, req+5, n-5, req+n+1, strlen(req)-n-1, &errptr);
 						if(errptr!=NULL) {
@@ -151,7 +153,7 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 												"OK\r\n");
 						}
 					} else {
-						LOG_TRACE(vlevel,_("Deny element: key %s value %s crc %08llX\n"), key, val, kcrc);
+						LOG_TRACE(vlevel,_("Deny element: key %s value %s crc %08llX bucket %i\n"), key, val, kcrc, kcrcm);
 						mg_printf(conn,
 											"HTTP/1.1 500 ERROR\r\n"
 											"Content-Type: text/plain\r\n"
@@ -229,7 +231,8 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						char *val=NULL;	
 						char *t;
 						unsigned long kcrc=0;
-						
+						int kcrcm=-1;
+
 						av=json_object_array_get_idx(msjo, n);
 						
 						tj=json_object_object_get(av, "key");
@@ -245,12 +248,14 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 						jsondeslash(&key);
 						jsondeslash(&val);
 						kcrc=crc32(kcrc, key, strlen(key));
-						
-						if((kcrc & hmask) <= hhval && (kcrc & hmask) >= lhval ) {
-							LOG_TRACE(vlevel,_("Allow element: %i: key %s value %s crc %08llX\n"),n, key, val, kcrc);
+						kcrcm=kcrc % BUCKETS;
+
+						if(kcrcm < buckethigh && kcrcm >= bucketlow) {
+							LOG_TRACE(vlevel,_("Allow element: key %s value %s crc %08llX bucket %i\n"), key, val, kcrc, kcrcm);
+
 							leveldb_writebatch_put(wb, key,strlen(key), val, strlen(val));
 						} else {
-							LOG_TRACE(vlevel,_("Deny element: %i: key %s value %s crc %08llX\n"),n, key, val, kcrc);
+							LOG_TRACE(vlevel,_("Deny element: key %s value %s crc %08llX bucket %i\n"), key, val, kcrc, kcrcm);
 						}
 
 						free(key);
@@ -396,7 +401,7 @@ int main(int argc, char **argv) {
   signal(SIGTERM,handlesig);
   
   // command line parsing
-  while ((goopt=getopt (argc, argv, "d:p:n:a:t:m:M:H:vh")) != -1) {
+  while ((goopt=getopt (argc, argv, "d:p:n:a:t:b:B:vh")) != -1) {
     switch (goopt) {
     case 'd': // database 
       dbd=calloc(strlen((char*)optarg)+1,sizeof(char));
@@ -412,14 +417,11 @@ int main(int argc, char **argv) {
     case 'n': // number of threads
       numthreads=atoi(optarg);
 			break;
-    case 'm': // low crc mapping
-			lhval=strtoll((char*)optarg,NULL,16);
+    case 'b': // low crc mapping
+			bucketlow=(int)strtoll((char*)optarg,NULL,10);
       break;
-    case 'M': // high crc mapping
-			hhval=strtoll((char*)optarg,NULL,16);
-      break;
-    case 'H': // crc mapping mask
-			hmask=strtoll((char*)optarg,NULL,16);
+    case 'B': // high crc mapping
+			buckethigh=(int)strtoll((char*)optarg,NULL,10);
       break;
     case 'v': // verbose
       vlevel++;
