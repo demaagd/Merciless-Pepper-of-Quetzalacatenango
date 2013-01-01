@@ -6,5 +6,6 @@ CPackSourceConfig.cmake
 lib*.so 
 Makefile 
 cskvs
+cskvb
 POTFILES
 LINGUAS

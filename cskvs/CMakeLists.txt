@@ -16,15 +16,20 @@ INCLUDE(leveldb.cmake)
 
 PKG_CHECK_MODULES(JSON json)
 PKG_CHECK_MODULES(ZLIB zlib)
+PKG_CHECK_MODULES(CURL libcurl)
+PKG_CHECK_MODULES(GLIB glib-2.0)
 
 INCLUDE_DIRECTORIES(${LEVELDB_INCLUDE_DIR})
-# INCLUDE_DIRECTORIES("${PROJECT_BINARY_DIR}")
+
 ADD_EXECUTABLE(cskvs cskvs.c util.c util.h mongoose.c mongoose.h)
 TARGET_LINK_LIBRARIES(cskvs pthread dl leveldb json z)
-
 INSTALL(TARGETS cskvs DESTINATION cskvs)
 
+ADD_EXECUTABLE(cskvb cskvb.c util.c util.h mongoose.c mongoose.h)
+TARGET_LINK_LIBRARIES(cskvb pthread dl json z curl glib-2.0)
+INSTALL(TARGETS cskvb DESTINATION cskvb)
+
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Dave DeMaagd")
-SET(CPACK_DEBIAN_PACKAGE_SUGGESTS "libsqlite3-dev (>=3.7.14.1-1), libmysqlclient-dev (>=5.5.24+dfsg-9)")
+SET(CPACK_DEBIAN_PACKAGE_SUGGESTS "")
 
 INCLUDE(CPack)
