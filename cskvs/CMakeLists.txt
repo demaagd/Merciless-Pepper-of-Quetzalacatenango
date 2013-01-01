@@ -19,13 +19,13 @@ PKG_CHECK_MODULES(ZLIB zlib)
 PKG_CHECK_MODULES(CURL libcurl)
 PKG_CHECK_MODULES(GLIB glib-2.0)
 
-INCLUDE_DIRECTORIES(${LEVELDB_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${LEVELDB_INCLUDE_DIRS} ${GLIB_INCLUDE_DIRS} ${ZLIB_LIBRARY_DIRS} ${CURL_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS})
 
-ADD_EXECUTABLE(cskvs cskvs.c util.c util.h mongoose.c mongoose.h)
+ADD_EXECUTABLE(cskvs cskvs.c util.c util.h mongoose.c mongoose.h config.h)
 TARGET_LINK_LIBRARIES(cskvs pthread dl leveldb json z)
 INSTALL(TARGETS cskvs DESTINATION cskvs)
 
-ADD_EXECUTABLE(cskvb cskvb.c util.c util.h mongoose.c mongoose.h)
+ADD_EXECUTABLE(cskvb cskvb.c util.c util.h mongoose.c mongoose.h config.h)
 TARGET_LINK_LIBRARIES(cskvb pthread dl json z curl glib-2.0)
 INSTALL(TARGETS cskvb DESTINATION cskvb)
 
