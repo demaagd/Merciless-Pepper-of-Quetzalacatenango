@@ -2,4 +2,4 @@
 
 cat .gitignore | xargs rm -rvf 
 cmake -DCMAKE_BUILD_TYPE=Debug ..
-make 
+make $@
