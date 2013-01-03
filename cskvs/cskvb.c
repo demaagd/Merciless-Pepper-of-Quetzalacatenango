@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <glib.h>
 #include <json/json.h> 
 #include <netinet/in.h>
 #include <signal.h>
@@ -39,11 +40,20 @@
 #include <unistd.h>
 #include <zlib.h>
 
+#include "config.h"
 #include "util.h"
 #include "mongoose.h"
 
 int done=0;
 int vlevel=0;
+
+typedef struct {
+	char **active;
+	char **failed;
+} bucket;
+
+GThreadPool *senderpool;
+struct bucket *bucketlist;
 
 void usage(char *err, int ec) {
   if(err!=NULL) {
@@ -52,11 +62,11 @@ void usage(char *err, int ec) {
   }
   
   fprintf(stderr,_("Usage (v%i.%i.%i):\n"),cskvs_VERSION_MAJOR,cskvs_VERSION_MINOR,cskvs_VERSION_REV);
-  fprintf(stderr,_(" -d database dir        -- Specifies database connection to use, module:/path/to/file\n"));
   fprintf(stderr,_(" -p port spec           -- Port nuber to listen on, passed directly to mongoose HTTP library\n"));
-  fprintf(stderr,_(" -n N                   -- Number of HTTP serving threads (default: 10)\n"));
   fprintf(stderr,_(" -a /path/to/accessfile -- Access log file, must be writable (if it exists) or in a writable dir (if it does not exist, it will be created)\n"));
-  fprintf(stderr,_(" -m mapping spec        -- Hash mapping specification\n"));
+  fprintf(stderr,_(" -t N                   -- Number of HTTP threads\n"));
+  fprintf(stderr,_(" -T N                   -- Number of storage threads\n"));
+  fprintf(stderr,_(" -s storage map         -- Storage mapping\n"));
   fprintf(stderr,_(" -v                     -- Increases verbose level, can be specified multiple times\n"));
   fprintf(stderr,_(" -h                     -- This help listing\n"));
 	
@@ -72,6 +82,10 @@ void handlesig(int sig) {
 			done=1; 
 		}
 	}
+}
+
+static void storagesender(void *data, void *user_data) {
+	LOG_TRACE(vlevel,_("Pool worker starting...\n"));
 }
 
 static void *mghandle(enum mg_event event, struct mg_connection *conn) {
@@ -119,23 +133,25 @@ static void *mghandle(enum mg_event event, struct mg_connection *conn) {
 
 int main(int argc, char **argv) {
   int goopt;
-  int listenport=8080;
-  int numthreads=10;
+  int listenport=8079;
+  int numhttpthreads=10;
+  int numstoragethreads=10;
   int tf;
   
-  char *dbd=NULL;
   char *lpstr=NULL;
   char *ntstr=NULL;
   char *alfile=NULL;
+	char *bucketmapstr=NULL;
+	char *ts;
 
   struct mg_context *ctx= NULL; 
   char **mgoptions;
-  
+
   signal(SIGINT,handlesig);
   signal(SIGTERM,handlesig);
   
   // command line parsing
-  while ((goopt=getopt (argc, argv, "p:n:a:t:vh")) != -1) {
+  while ((goopt=getopt (argc, argv, "p:a:t:s:vh")) != -1) {
     switch (goopt) {
     case 'a': // access log, passed to mongoose
       alfile=calloc(strlen((char*)optarg)+1,sizeof(char));
@@ -144,9 +160,16 @@ int main(int argc, char **argv) {
     case 'p': // port
       listenport=atoi(optarg);
       break;
-    case 'n': // number of threads
-      numthreads=atoi(optarg);
+    case 't': // number of HTTP threads
+      numhttpthreads=atoi(optarg);
 			break;
+    case 'T': // number of storage threads
+      numstoragethreads=atoi(optarg);
+			break;
+    case 's': // bucket/storage map
+      bucketmapstr=calloc(strlen((char*)optarg)+1,sizeof(char));
+      strncpy(bucketmapstr,(char*)optarg,strlen((char*)optarg));
+      break;
     case 'v': // verbose
       vlevel++;
       break;
@@ -176,17 +199,78 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
   
-  if(numthreads<0 || numthreads>1024) {
-    LOG_FATAL(vlevel, _("Given threads out of bounds: %i\n"),numthreads);
+  if(numhttpthreads<0 || numhttpthreads>1024) {
+    LOG_FATAL(vlevel, _("Given HTTP threads out of bounds: %i\n"),numhttpthreads);
     exit(EXIT_FAILURE);
   }
+
+  if(numstoragethreads<0 || numstoragethreads>1024) {
+    LOG_FATAL(vlevel, _("Given storage threads out of bounds: %i\n"),numstoragethreads);
+    exit(EXIT_FAILURE);
+  }
+
+	// 
+	if(bucketmapstr!=NULL) {
+		bucketlist=calloc(BUCKETS,sizeof(bucket));
+		if(strstr((const char*)bucketmapstr, ",")) { // is a csv
+			char *cptr;
+			char *tres;
+			tres=strtok_r(bucketmapstr, ",", &cptr);
+			while(tres!=NULL) {
+				int tlen=strlen(tres);
+				int spos=-1;
+				int cpos=-1;
+				int n=tlen-1;
+
+				LOG_TRACE(vlevel,_("Mapping token: %s\n"),tres);
+
+				while(n>0) {
+					if(tres[n]=='/') {
+						spos=n;
+						n--;
+						break;
+					}
+					n--;
+				}
+				while(n>0) {
+					if(tres[n]==':') {
+						cpos=n;
+						n--;
+						break;
+					}
+					n--;
+				}
+				if(cpos>-1 && spos>-1) {
+					LOG_TRACE(vlevel,_("Mapping token: %s colon: %i slash %i\n"),tres, cpos, spos);
+				} else {
+					LOG_FATAL(vlevel, _("Malformed bucket mapping: %s\n"),tres);
+					exit(EXIT_FAILURE);
+				}
+				
+				tres=strtok_r(NULL, ",", &cptr);
+			}
+
+		} else { // single element
+			if(strstr((const char*)bucketmapstr, ":") && strstr((const char*)bucketmapstr, "/")) { 
+
+				
+			} else {
+				LOG_FATAL(vlevel, _("Malformed bucket mapping: %s\n"),bucketmapstr);
+				exit(EXIT_FAILURE);
+			}
+		}
+	} else {
+    LOG_FATAL(vlevel, _("No bucket mapping given\n"));
+    exit(EXIT_FAILURE);
+	}
+	exit(1);
 
   // set mgoptions - XXX this needs to be handled better
   lpstr=calloc(7,sizeof(char));
   snprintf(lpstr,6,"%i",listenport);
   
-  ntstr=calloc(4,sizeof(char));
-  snprintf(ntstr,3,"%i",numthreads);
+  ntstr=calloc(5,sizeof(char));
+  snprintf(ntstr,4,"%i",numhttpthreads);
   
   if(alfile!=NULL) {
     mgoptions = calloc(9,sizeof(char*));
@@ -206,6 +290,12 @@ int main(int argc, char **argv) {
   } else {
     mgoptions[6]=NULL;
   }
+
+	LOG_INFO(vlevel, _("Creating sender pool\n"));
+	senderpool=g_thread_pool_new(storagesender,NULL,numstoragethreads,1,NULL);
+
+	g_thread_pool_push(senderpool,"foo",NULL);
+  
   // main loop
   LOG_INFO(vlevel, _("Starting Mongoose HTTP server loop\n"));
   ctx = mg_start(&mghandle, NULL, (const char**)mgoptions);
@@ -220,11 +310,13 @@ int main(int argc, char **argv) {
     LOG_FATAL(vlevel,_("Error in creating Mongoose HTTP server\n"));
   }
 
+
+
   LOG_TRACE(vlevel, _("Cleaning up\n"));
-  free(dbd);
   free(lpstr);
   free(ntstr);
   free(mgoptions);
+  free(bucketmapstr);
   
   return EXIT_SUCCESS;
 }

@@ -21,7 +21,9 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__ 
 
+#ifndef BUCKETS
 #define BUCKETS 256 
+#endif // BUCKETS
 
-#endif
+#endif // __CONFIG_H__
 

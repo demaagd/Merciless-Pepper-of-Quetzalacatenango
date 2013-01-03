@@ -53,7 +53,7 @@ leveldb_writeoptions_t *wopt;
 char *errptr;	  
 
 int bucketlow=0;
-int buckethigh=255;
+int buckethigh=BUCKETS;
 
 void usage(char *err, int ec) {
   if(err!=NULL) {
